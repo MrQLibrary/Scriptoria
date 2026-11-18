@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:; connect-src 'self' data: blob:; manifest-src 'self'; font-src 'self' data:">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scriptoria</title>
+<link rel="manifest" id="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2b6cff">
+<link rel="icon" id="favicon" href="icons/app/board.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" id="touchicon" href="icons/app/board-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="light">
+<div id="dragbar"></div>
+
+<!-- Startbildschirm -->
+<div id="home" class="screen">
+  <div class="home-inner">
+    <div class="home-head">
+      <div class="brand"><img class="logo" id="logo" src="icons/app/board.svg" alt=""><h1>Scriptoria</h1></div>
+      <div class="home-actions">
+        <button class="btn primary" id="h-new">＋ Neues Whiteboard</button>
+        <button class="btn" id="h-install" hidden>App installieren</button>
+        <button class="btn" id="h-open">Datei öffnen …</button>
+        <button class="btn" id="h-help" title="Alle Funktionen erklärt">ⓘ Hilfe</button>
+        <button class="btn icon" id="h-settings" title="Einstellungen">⚙</button>
+      </div>
+    </div>
+    <h2 id="h-title">Zuletzt verwendet</h2>
+    <div id="h-grid" class="grid"></div>
+    <section id="h-hist" hidden>
+      <h2>Historische Tafeln</h2>
+      <div id="h-hgrid" class="grid"></div>
+    </section>
+    <p id="h-empty" class="muted" hidden>Noch keine Whiteboards. Beginnen Sie mit „Neues Whiteboard“.</p>
+  </div>
+</div>
+
+<!-- Editor -->
+<div id="editor" class="screen" hidden>
+  <canvas id="board"></canvas>
+  <canvas id="overlay"></canvas>
+  <textarea id="ed" hidden spellcheck="false"></textarea>
+  <header id="topbar"></header>
+  <nav id="tools"></nav>
+  <aside id="props"></aside>
+  <aside id="elec" hidden></aside>
+  <div id="pens"></div>
+  <div id="zoombar"></div>
+  <div id="pagebar"></div>
+</div>
+
+<div id="toast" hidden></div>
+<div id="modal-root"></div>
+<input type="file" id="f-img" accept=".png,.svg,.jpg,.jpeg,.gif,.webp,.bmp,.avif,.pdf,image/*,application/pdf" multiple hidden>
+<input type="file" id="f-owb" accept=".owb,.json" hidden>
+
+<script src="lib/pdf.min.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
+<script src="js/webapi.js"></script>
+<script src="js/core.js"></script>
+<script src="js/symbols.js"></script>
+<script src="js/draw.js"></script>
+<script src="js/tools.js"></script>
+<script src="js/input.js"></script>
+<script src="js/extras.js"></script>
+<script src="js/historic.js"></script>
+<script src="js/pages.js"></script>
+<script src="js/smart.js"></script>
+<script src="js/templates.js"></script>
+<script src="js/dialogs.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+<script src="js/pwa.js"></script>
+</body>
+</html>

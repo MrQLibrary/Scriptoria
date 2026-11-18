@@ -1,0 +1,55 @@
+{
+  "name": "Scriptoria",
+  "short_name": "Scriptoria",
+  "description": "Digitales Whiteboard mit Elektronik-Baukasten, Formeln und historischen Tafeln",
+  "lang": "de",
+  "start_url": "../index.html",
+  "scope": "../",
+  "id": "../",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
+  "background_color": "#ffffff",
+  "theme_color": "#2b6cff",
+  "icons": [
+    {
+      "src": "../icons/app/clay-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../icons/app/clay-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../icons/app/clay-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "../icons/app/clay.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": "../index.html",
+      "accept": {
+        "application/json": [
+          ".owb"
+        ]
+      }
+    }
+  ],
+  "categories": [
+    "education",
+    "productivity"
+  ]
+}
