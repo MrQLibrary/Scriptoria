@@ -15,7 +15,7 @@ const IC = {
   panels: 'M3 4h18v16H3z M8 4v16 M16 4v16', panelsoff: 'M3 4h18v16H3z M3 3l18 18',
   info: 'M12 8h.01 M11 12h1v5h1 M12 3a9 9 0 100 18 9 9 0 000-18z', chev: 'M9 6l6 6-6 6',
   geo: 'M3 18h18L12 9z M12 18v-3', parab: 'M4 4c3 14 13 14 16 0 M3 18h18', wire: 'M3 17h6V7h6v10h6 M3 17h.01 M21 17h.01',
-  latex: 'M4 6h7 M7.5 6v12 M13 9l7 9 M20 9l-7 9', play: 'M7 4l13 8-13 8z', present: 'M3 4h18v12H3z M8 20h8 M12 16v4', plot: 'M4 20V4 M4 20h16 M6 16c3-9 6-9 8-4s4 4 6-6', phasor: 'M4 19h16 M4 19L17 7 M17 7l-5 1 M17 7l-1 5 M4 19l9-1', diagram: 'M3 4h18v16H3z M3 9h18 M3 14h18 M9 4v16 M15 4v16', timer: 'M12 8v5l3 2 M10 2h4 M12 4a9 9 0 100 18 9 9 0 000-18z', scroll: 'M6 4h11a3 3 0 013 3v1h-4 M6 4a3 3 0 00-3 3v1h3 M6 4v13a3 3 0 003 3h9a3 3 0 003-3v-1H9v1a3 3 0 01-3 3', save: 'M5 3h12l4 4v14H5z M8 3v6h8V3 M8 21v-7h8v7', fit: 'M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5'
+  latex: 'M4 6h7 M7.5 6v12 M13 9l7 9 M20 9l-7 9', play: 'M7 4l13 8-13 8z', fourier: 'M3 12h2l2-7 3 14 3-10 2 6 2-3h4 M4 21h16', calc: 'M6 3h12v18H6z M8.5 6.5h7v3h-7z M9 13h.01 M12 13h.01 M15 13h.01 M9 16h.01 M12 16h.01 M15 16h.01 M9 19h.01 M12 19h.01 M15 19h.01', present: 'M3 4h18v12H3z M8 20h8 M12 16v4', plot: 'M4 20V4 M4 20h16 M6 16c3-9 6-9 8-4s4 4 6-6', phasor: 'M4 19h16 M4 19L17 7 M17 7l-5 1 M17 7l-1 5 M4 19l9-1', diagram: 'M3 4h18v16H3z M3 9h18 M3 14h18 M9 4v16 M15 4v16', timer: 'M12 8v5l3 2 M10 2h4 M12 4a9 9 0 100 18 9 9 0 000-18z', scroll: 'M6 4h11a3 3 0 013 3v1h-4 M6 4a3 3 0 00-3 3v1h3 M6 4v13a3 3 0 003 3h9a3 3 0 003-3v-1H9v1a3 3 0 01-3 3', save: 'M5 3h12l4 4v14H5z M8 3v6h8V3 M8 21v-7h8v7', fit: 'M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5'
 };
 const ico = n => `<svg viewBox="0 0 24 24">${IC[n].split(' M').map((d, i) => `<path d="${i ? 'M' : ''}${d}"/>`).join('')}</svg>`;
 const tbBtn = (icon, title, on, fn, extra) => h('button', { class: 'tb' + (on ? ' on' : ''), title, html: ico(icon) + (extra || ''), onclick: fn });
@@ -26,7 +26,7 @@ const TOOLS = [
   ['line', 'line', 'Linie (L)'], ['arrow', 'arrow', 'Pfeil (A)'], ['rect', 'rect', 'Rechteck (R)'], ['ellipse', 'ellipse', 'Ellipse (O)'], '-',
   ['text', 'text', 'Text (T)'], ['note', 'note', 'Haftnotiz (N)'], ['img', 'image', 'Bild oder PDF einfügen'], '-',
   ['compass', 'compass', 'Zirkel (C)'], ['ruler', 'ruler', 'Lineal 1:1 (U)'], ['geo', 'geo', 'Geodreieck (G)'], ['parab', 'parab', 'Parabel (K)'], ['laser', 'laser', 'Laserpointer (J)'], '-',
-  ['plot', 'plot', 'Funktionsplotter & Koordinatensystem'], ['phasor', 'phasor', 'Zeigerdiagramm'], ['diagram', 'diagram', 'Diagramm-Vorlagen'], ['timer', 'timer', 'Stoppuhr'], '-',
+  ['plot', 'plot', 'Funktionsplotter & Koordinatensystem'], ['phasor', 'phasor', 'Zeigerdiagramm'], ['diagram', 'diagram', 'Diagramm-Vorlagen'], ['timer', 'timer', 'Stoppuhr'], ['fourier', 'fourier', 'Petit Fourier (Fourier-Reihe)'], ['calc', 'calc', 'Wissenschaftlicher Taschenrechner'], '-',
   ['elec', 'chip', 'Elektronik-Baukasten (B)'], ['wire', 'wire', 'Leitung ziehen (W)'], ['sim', 'play', 'Schaltung simulieren']
 ];
 const PALETTE = (() => {
@@ -210,10 +210,13 @@ function refreshUI() {
     if ((id === 'elec' || id === 'wire' || id === 'sim') && !S.settings.electronics) continue;
     if (!toolAllowed(id === 'img' ? 'image' : id) || S.settings.tools[id] === false) continue;
     lastSep = false;
-    const on = id === 'sim' ? SIM.on : id === 'timer' ? !!S.timerOpen : id === 'ruler' ? S.ruler.on : id === 'geo' ? S.geo.on : id === 'elec' ? S.elecOpen : id === 'img' ? false : (S.tool === id || (id === 'select' && S.tool === 'place' && false));
-    tools.append(tbBtn(icon, tip, on, ev => { if (id === 'img') $('#f-img').click(); else if (id === 'ruler') toggleRuler(); else if (id === 'geo') toggleGeo(); else if (id === 'elec') toggleElec(); else if (id === 'plot') openPlotDialog(); else if (id === 'phasor') openPhasorDialog(); else if (id === 'diagram') diagramMenu(ev.currentTarget); else if (id === 'timer') toggleTimer(); else if (id === 'sim') { SIM.on ? stopSim() : startSim(); } else if (S.tool === id && ['compass', 'laser', 'parab', 'wire'].includes(id)) toggleOffTool(); else setTool(id); }));
+    const on = id === 'sim' ? SIM.on : id === 'timer' ? !!S.timerOpen : id === 'fourier' ? !!S.fourierOpen : id === 'calc' ? !!S.calcOpen : id === 'ruler' ? S.ruler.on : id === 'geo' ? S.geo.on : id === 'elec' ? S.elecOpen : id === 'img' ? false : (S.tool === id || (id === 'select' && S.tool === 'place' && false));
+    tools.append(tbBtn(icon, tip, on, ev => { if (id === 'img') $('#f-img').click(); else if (id === 'ruler') toggleRuler(); else if (id === 'geo') toggleGeo(); else if (id === 'elec') toggleElec(); else if (id === 'plot') openPlotDialog(); else if (id === 'phasor') openPhasorDialog(); else if (id === 'diagram') diagramMenu(ev.currentTarget); else if (id === 'timer') toggleTimer(); else if (id === 'fourier') toggleFourier(); else if (id === 'calc') toggleCalc(); else if (id === 'sim') { SIM.on ? stopSim() : startSim(); } else if (S.tool === id && ['compass', 'laser', 'parab', 'wire'].includes(id)) toggleOffTool(); else setTool(id); }));
   }
   while (tools.lastChild && tools.lastChild.classList.contains('hsep')) tools.lastChild.remove();
+  const shade = () => { tools.classList.toggle('more-t', tools.scrollTop > 2); tools.classList.toggle('more-b', tools.scrollTop + tools.clientHeight < tools.scrollHeight - 2); };
+  if (!tools._shade) { tools._shade = true; tools.addEventListener('scroll', shade, { passive: true }); addEventListener('resize', shade); }
+  requestAnimationFrame(shade);
   // Stiftleiste
   const pens = $('#pens'); pens.replaceChildren(...pensList().map((p, i) => h('button', { class: 'pen' + (penOn(i) ? ' on' : ''), title: p.name + (i < 9 ? ` (${i + 1})` : ''), html: penSVG(p), onclick: () => selectPen(i) })));
   pens.classList.toggle('hist', !!curTpl());
@@ -299,7 +302,7 @@ function libButtons(kind) {                      // Desktop: Ordner öffnen · W
 }
 async function saveSelectionAsCircuit() {
   if (!S.sels.length) { toast('Markieren Sie zuerst die Teile der Schaltung (Rahmen aufziehen oder Strg+A).', 4500); return; }
-  const name = await askText('Schaltung speichern', 'Name der Schaltung', 'Meine Schaltung', 'Speichern'); if (!name) return;
+  const name = await askText('Schaltung speichern', 'Name der Schaltung', tr('Meine Schaltung'), 'Speichern'); if (!name) return;
   const c = circuitFromSelection(name); if (!c) return;
   await api.saveUser('circuits', name, c); await loadUserLibrary(false);
   S.elecOpen = true; S.elecTab = 'circuits'; refreshUI(); toast('Gespeichert unter „Eigene Schaltungen“.');

@@ -33,8 +33,13 @@ const SIMDEF = {
   switch: ['SW', ''], button: ['SW', ''], switch_spdt: ['SPDT', ''], pot: ['POT', '10 kΩ'],
   ammeter: ['AM', ''], voltmeter: ['VM', ''], ground: ['GND', ''], chassis: ['GND', ''],
   opamp: ['OA', '±15 V'], opamp2: ['OA', '±15 V'], comparator: ['CMP', ''], npn: ['BJT', 'β = 100'], pnp: ['BJT', 'β = 100'],
+  // erweiterte Bauteile (vereinfachte Modelle, beim Start wird nachgefragt)
+  thyristor: ['SCR', '400 V'], triac: ['TRIAC', ''], diac: ['DIAC', '32 V'], nmos: ['MOS', 'Uth = 2 V'], pmos: ['MOS', 'Uth = 2 V'], njfet: ['JFET', 'UP = -2 V'],
+  transformer: ['XF', '10:1'], crystal: ['C', '20 pF'], phototrans: ['PT', '1 mA'], opto: ['OPTO', 'CTR = 1'], solar: ['SOL', '0,5 A'],
+  vcvs: ['V', '5 V'], cccs: ['I', '10 mA'], wattmeter: ['WM', ''], ohmmeter: ['OHM', ''], dff: ['DFF', ''], srff: ['SRFF', ''],
   and: ['GATE', ''], nand: ['GATE', ''], or: ['GATE', ''], nor: ['GATE', ''], xor: ['GATE', ''], xnor: ['GATE', ''], not: ['GATE', ''], buffer: ['GATE', ''], schmitt: ['GATE', '']
 };
+const SIM_ADV = new Set(['thyristor', 'triac', 'diac', 'nmos', 'pmos', 'njfet', 'transformer', 'crystal', 'phototrans', 'opto', 'solar', 'vcvs', 'cccs', 'wattmeter', 'ohmmeter', 'dff', 'srff']);
 const SIM_IGNORE = new Set(['varrow', 'iarrow', 'junction', 'terminal', 'crossing', 'antenna']);   // nur Verbindungspunkte bzw. Beschriftung
 function simValue(o) { return o.val || (o.label && !/\$/.test(o.label) && /\d\s*[pnuµμmkKMG]?\s*(Ω|F|H|V|A|Hz)/.test(o.label) ? o.label : ''); }
 function simDefault(o) { const d = SIMDEF[o.sym]; return d ? d[1] : ''; }
@@ -62,7 +67,7 @@ function buildNet() {
   let gndRoot = null;
   for (const o of syms) {
     const d = SIMDEF[o.sym], ks = pinKeys.get(o);
-    if (!d) { if (!SIM_IGNORE.has(o.sym)) unsupported.add(SYM[o.sym].name); continue; }
+    if (!d || (SIM_ADV.has(o.sym) && SIM.adv === false)) { if (!SIM_IGNORE.has(o.sym)) unsupported.add(SYM[o.sym].name); continue; }
     if (d[0] === 'GND') { gndRoot = gndRoot || find(ks[0]); uni(ks[0], gndRoot); gndRoot = find(gndRoot); continue; }
     els.push({ o, type: d[0], keys: ks });
   }
@@ -71,12 +76,13 @@ function buildNet() {
   const gIn = new Set(), drv = new Set(), logicTerms = [];
   for (const e of els) {
     if (e.type === 'GATE') { const one = e.keys.length === 2; e.keys.forEach((k, i) => (i === (one ? 1 : 2) ? drv : gIn).add(find(k))); }
+    else if (e.type === 'DFF' || e.type === 'SRFF') e.keys.forEach((k, i) => (i >= 2 ? drv : gIn).add(find(k)));
     else if (['V', 'AC', 'VCC', 'OA', 'CMP'].includes(e.type)) e.keys.forEach(k => drv.add(find(k)));
   }
   for (const o of S.objs) if (o.type === 'symbol' && o.sym === 'terminal' && pinKeys.has(o)) {
     const k = pinKeys.get(o)[0], r = find(k);
     if (gIn.has(r) && !drv.has(r)) { els.push({ o, type: 'LIN', keys: [k] }); logicTerms.push({ o, k, isIn: true }); }
-    else if (drv.has(r) && [...els].some(e => e.type === 'GATE' && find(e.keys[e.keys.length === 2 ? 1 : 2]) === r)) logicTerms.push({ o, k, isIn: false });
+    else if (drv.has(r) && els.some(e => (e.type === 'GATE' && find(e.keys[e.keys.length === 2 ? 1 : 2]) === r) || ((e.type === 'DFF' || e.type === 'SRFF') && (find(e.keys[2]) === r || find(e.keys[3]) === r)))) logicTerms.push({ o, k, isIn: false });
   }
   // Knotennummern: 0 = Masse
   const idx = new Map(); let n = 0;
@@ -86,8 +92,9 @@ function buildNet() {
   let m = 0;                                             // zusätzliche Unbekannte (Ströme in Spannungsquellen)
   for (const e of els) {
     e.n = e.keys.map(node); e.val = simValue(e.o);
-    if (['V', 'AC', 'AM', 'VCC', 'OA', 'CMP', 'GATE', 'LIN'].includes(e.type)) e.k = m++;
-    e.st = { v: 0, i: 0, vd: 0, vd2: 0, vbe: 0, vbc: 0, out: 0 };
+    if (['V', 'AC', 'AM', 'VCC', 'OA', 'CMP', 'GATE', 'LIN', 'WM', 'DFF', 'SRFF'].includes(e.type)) e.k = m++;
+    if (e.type === 'DFF' || e.type === 'SRFF') e.k2 = m++;
+    e.st = { v: 0, i: 0, vd: 0, vd2: 0, vg1: 0, vg2: 0, vbe: 0, vbc: 0, out: 0, on: false, q: 0, clk: false, v1: 0, v2: 0, i1: 0, i2: 0, iled: 0 };
   }
   // Leitungsabschnitte für die Strompunkte
   const segs = [];
@@ -118,6 +125,16 @@ function pnjlim(vn, vo, vt, vcrit) {                     // Spannungsbegrenzung 
   return vn;
 }
 const DIODE_P = { D: [1e-14, 1], LED: [1e-20, 2], Z: [1e-14, 1] };
+function fetI(vgs, vds, Vth, K) {                         // Drainstrom mit Ableitungen (Trioden- und Sättigungsbereich)
+  const vov = vgs - Vth; if (vov <= 0) return { I: 0, gm: 0, gds: 0 };
+  if (vds < vov) return { I: K * (vov * vds - vds * vds / 2), gm: K * vds, gds: K * (vov - vds) };
+  return { I: K / 2 * vov * vov * (1 + 0.01 * vds), gm: K * vov * (1 + 0.01 * vds), gds: K / 2 * vov * vov * 0.01 };
+}
+function xfRatio(str) {                                  // „10:1“, „230 V / 12 V“, „ü = 10“
+  const m = /(\d+(?:[.,]\d+)?)\s*V?\s*[:/]\s*(\d+(?:[.,]\d+)?)/.exec(String(str || ''));
+  if (m) { const p = parseFloat(m[1].replace(',', '.')), q = parseFloat(m[2].replace(',', '.')); if (p > 0 && q > 0) return p / q; }
+  return Math.abs(parseSI(str, 10)) || 10;
+}
 
 /* ---------- Ein Zeitschritt ---------- */
 function simStep(net, dt, t) {
@@ -133,13 +150,20 @@ function simStep(net, dt, t) {
     const ex = Math.exp(Math.min(v / vt, 80)), id = Is * (ex - 1), gd = Is / vt * ex + 1e-12;
     G(p, q, gd); Isrc(p, q, id - gd * v - gd * off);
   };
+  const add = (r, c, v) => { if (r && c) A[(r - 1) * N + c - 1] += v; };
+  const VCCS = (p, q, cp, cq, g) => { add(p, cp, g); add(p, cq, -g); add(q, cp, -g); add(q, cq, g); };   // Strom g·(V(cp)−V(cq)) von p nach q
+  const fet = (e, g, d, s0, sg, Vth, K) => {           // Feldeffekttransistor, quadratisches Modell (Drain/Source tauschen bei Umpolung)
+    let dd = d, ss = s0; if (sg * (V(d) - V(s0)) < 0) { dd = s0; ss = d; }
+    const vgs = sg * (V(g) - V(ss)), vds = sg * (V(dd) - V(ss)), r = fetI(vgs, vds, Vth, K);
+    VCCS(dd, ss, g, ss, r.gm); G(dd, ss, r.gds + 1e-9); Isrc(dd, ss, sg * r.I - r.gm * (V(g) - V(ss)) - r.gds * (V(dd) - V(ss)));
+  };
   const logicIn = q => (q ? (net.xPrev ? net.xPrev[q - 1] : 0) : 0) > 2.5;
   let nonlin = false;
   for (let it = 0; it < 40; it++) {
     A.fill(0); B.fill(0);
     for (let i = 0; i < n; i++) A[i * N + i] += 1e-9;   // kleiner Leitwert gegen Masse: verhindert schwebende Knoten
     for (const e of net.els) {
-      const [a, b, c] = e.n, val = e.val;
+      const [a, b, c, d] = e.n, val = e.val;
       switch (e.type) {
         case 'R': G(a, b, 1 / Math.max(1e-6, parseSI(val, 1000))); break;
         case 'LAMP': G(a, b, 1 / Math.max(1e-3, parseSI(val, 100))); break;
@@ -180,6 +204,25 @@ function simStep(net, dt, t) {
           break;
         }
         case 'LIN': Vsrc(a, 0, e.k, e.o.logic ? 5 : 0); break;
+        case 'SCR': nonlin = true; diode(e, c, b, 1e-14, 1, 0, 'vg1'); if (e.st.on) diode(e, a, b, 1e-12, 1.5, 0, 'vd'); else G(a, b, 1e-9); break;
+        case 'TRIAC': nonlin = true; diode(e, c, b, 1e-14, 1, 0, 'vg1'); diode(e, b, c, 1e-14, 1, 0, 'vg2');
+          if (e.st.on) { diode(e, a, b, 1e-12, 1.5, 0, 'vd'); diode(e, b, a, 1e-12, 1.5, 0, 'vd2'); } else G(a, b, 1e-9); break;
+        case 'DIAC': { nonlin = true; const off = Math.max(0, Math.abs(parseSI(val, 32)) - 0.6); diode(e, a, b, 1e-14, 1, off, 'vd'); diode(e, b, a, 1e-14, 1, off, 'vd2'); break; }
+        case 'MOS': { nonlin = true; const p = e.o.sym === 'pmos'; fet(e, a, p ? c : b, p ? b : c, p ? -1 : 1, Math.abs(parseSI(val, 2)), 0.05); break; }
+        case 'JFET': { nonlin = true; const up = -Math.abs(parseSI(val, -2)) || -2; fet(e, a, b, c, 1, up, 2 * 0.01 / (up * up)); diode(e, a, c, 1e-14, 1, 0, 'vd'); diode(e, a, b, 1e-14, 1, 0, 'vd2'); break; }
+        case 'XF': {                                       // Transformator als gekoppelte Spulen (Kopplung 0,999): sperrt Gleichspannung
+          const r = xfRatio(val), L1 = 10, L2 = L1 / (r * r), M = 0.999 * Math.sqrt(L1 * L2), det = L1 * L2 - M * M;
+          const Gm = [[L2 / det * dt / 2, -M / det * dt / 2], [-M / det * dt / 2, L1 / det * dt / 2]], P = [[a, b], [c, d]], vo = [e.st.v1, e.st.v2], io = [e.st.i1, e.st.i2];
+          e.Gm = Gm; e.ieq = [0, 1].map(j => io[j] + Gm[j][0] * vo[0] + Gm[j][1] * vo[1]);
+          for (let j = 0; j < 2; j++) { for (let k = 0; k < 2; k++) VCCS(P[j][0], P[j][1], P[k][0], P[k][1], Gm[j][k]); Isrc(P[j][0], P[j][1], e.ieq[j]); }
+          break;
+        }
+        case 'PT': { nonlin = true; const Ip = Math.abs(parseSI(val, 1e-3)), v = V(a) - V(b), th = Math.tanh(v / 0.1), g = Ip / 0.1 * (1 - th * th) + 1e-9; G(a, b, g); Isrc(a, b, Ip * th - g * v); break; }
+        case 'OPTO': { nonlin = true; diode(e, a, b, ...DIODE_P.LED, 0, 'vd'); const ctr = Math.abs(parseSI(val, 1)), Ip = ctr * Math.max(0, e.st.iled), v = V(c) - V(d), th = Math.tanh(v / 0.1), g = Ip / 0.1 * (1 - th * th) + 1e-9; G(c, d, g); Isrc(c, d, Ip * th - g * v); break; }
+        case 'SOL': nonlin = true; Isrc(b, a, Math.abs(parseSI(val, 0.5))); diode(e, a, b, 1e-10, 1.5, 0, 'vd'); break;
+        case 'WM': Vsrc(a, b, e.k, 0); break;
+        case 'OHM': Isrc(b, a, 1e-3); G(a, b, 1e-12); break;
+        case 'DFF': case 'SRFF': Vsrc(c, 0, e.k, e.st.q ? 5 : 0); Vsrc(d, 0, e.k2, e.st.q ? 0 : 5); break;
         case 'CMP': { const pv = q => (q && net.xPrev ? net.xPrev[q - 1] : 0); Vsrc(c, 0, e.k, pv(a) > pv(b) ? 5 : 0); break; }
         case 'GATE': {
           const sym = e.o.sym, one = ['not', 'buffer', 'schmitt'].includes(sym), out = one ? b : c;
@@ -217,6 +260,33 @@ function simStep(net, dt, t) {
         const vbe = s * (V(nb) - V(ne)), vbc = s * (V(nb) - V(nc)), iF = Is * (Math.exp(Math.min(vbe / VT, 80)) - 1), iR = Is * (Math.exp(Math.min(vbc / VT, 80)) - 1);
         const Ic = s * (iF - 2 * iR), Ib = s * (iF / beta + iR); e.Ipins = [Ib, Ic, -(Ib + Ic)]; break;
       }
+      case 'SCR': case 'TRIAC': {
+        const vak = va - vb, vg = V(c) - vb, dI = (v, Is, nv) => Is * (Math.exp(Math.min(v / (nv * VT), 80)) - 1);
+        const Ig = dI(vg, 1e-14, 1) - (e.type === 'TRIAC' ? dI(-vg, 1e-14, 1) : 0);
+        const Ia = e.st.on ? dI(vak, 1e-12, 1.5) - (e.type === 'TRIAC' ? dI(-vak, 1e-12, 1.5) : 0) : 1e-9 * vak;
+        if (e.st.on) { if (Math.abs(Ia) < 1e-3) e.st.on = false; }                                    // Haltestrom unterschritten
+        else if ((e.type === 'TRIAC' ? Math.abs(Ig) : Ig) > 1e-3 || (e.type === 'SCR' && vak > Math.abs(parseSI(e.val, 400)))) e.st.on = true;   // Zünden
+        e.Ipins = [Ia, -Ia - Ig, Ig]; break;
+      }
+      case 'DIAC': { const off = Math.max(0, Math.abs(parseSI(e.val, 32)) - 0.6), v = va - vb; e.I = 1e-14 * (Math.exp(Math.min((v - off) / VT, 80)) - 1) - 1e-14 * (Math.exp(Math.min((-v - off) / VT, 80)) - 1); break; }
+      case 'MOS': case 'JFET': {
+        const p = e.o.sym === 'pmos', sg = p ? -1 : 1, g = a, dN = p ? c : b, sN = p ? b : c, Vth = e.type === 'JFET' ? (-Math.abs(parseSI(e.val, -2)) || -2) : Math.abs(parseSI(e.val, 2)), K = e.type === 'JFET' ? 0.02 / (Vth * Vth) : 0.05;
+        let vd = V(dN), vs = V(sN), fl = 1; if (sg * (vd - vs) < 0) { [vd, vs] = [vs, vd]; fl = -1; }
+        const Id = fl * sg * fetI(sg * (V(g) - vs), sg * (vd - vs), Vth, K).I;   // vom Drain- zum Source-Anschluss
+        e.Ipins = [0, p ? -Id : Id, p ? Id : -Id]; break;
+      }
+      case 'XF': { e.st.v1 = va - vb; e.st.v2 = V(c) - V(e.n[3]); e.st.i1 = e.Gm[0][0] * e.st.v1 + e.Gm[0][1] * e.st.v2 + e.ieq[0]; e.st.i2 = e.Gm[1][0] * e.st.v1 + e.Gm[1][1] * e.st.v2 + e.ieq[1]; e.Ipins = [e.st.i1, -e.st.i1, e.st.i2, -e.st.i2]; break; }
+      case 'PT': e.I = Math.abs(parseSI(e.val, 1e-3)) * Math.tanh((va - vb) / 0.1); break;
+      case 'OPTO': { const [Is, nn] = DIODE_P.LED, il = Is * (Math.exp(Math.min((va - vb) / (nn * VT), 80)) - 1), io = Math.abs(parseSI(e.val, 1)) * Math.max(0, e.st.iled) * Math.tanh((V(c) - V(e.n[3])) / 0.1); e.st.iled = il; e.Ipins = [il, -il, io, -io]; break; }
+      case 'SOL': e.I = 1e-10 * (Math.exp(Math.min((va - vb) / (1.5 * VT), 80)) - 1) - Math.abs(parseSI(e.val, 0.5)); e.meas = va - vb; break;
+      case 'WM': e.I = x[n + e.k]; e.meas = e.I * va; e.unit = 'W'; break;
+      case 'OHM': e.I = -1e-3; e.meas = (va - vb) / 1e-3; e.unit = 'Ω'; break;
+      case 'DFF': case 'SRFF': {
+        const i0 = va > 2.5, i1 = vb > 2.5;
+        if (e.type === 'DFF') { if (i1 && !e.st.clk) e.st.q = i0 ? 1 : 0; e.st.clk = i1; }               // steigende Taktflanke übernimmt D
+        else if (i0 && !i1) e.st.q = 1; else if (i1 && !i0) e.st.q = 0;
+        e.Ipins = [0, 0, x[n + e.k], x[n + e.k2]]; break;
+      }
       case 'OA': case 'CMP': case 'GATE': { const out = e.type === 'GATE' && ['not', 'buffer', 'schmitt'].includes(e.o.sym) ? 1 : 2; e.Ipins = e.n.map((_, i) => i === out ? x[n + e.k] : 0); break; }
     }
     if (e.I != null) e.Ipins = [e.I, -e.I];
@@ -246,6 +316,21 @@ function wireCurrents(net) {
 function simDirty() { SIM.dirty = true; }
 function startSim() {
   if (S.editing) commitEdit();
+  const adv = [...new Set(S.objs.filter(o => o.type === 'symbol' && SIM_ADV.has(o.sym)).map(o => SYM[o.sym].name))], mode = S.settings.simAdv || 'ask';
+  if (adv.length && mode === 'ask') { askSimAdv(adv).then(r => { if (r != null) { SIM.adv = r; startSim2(); } }); return; }
+  SIM.adv = mode !== 'no'; startSim2();
+}
+async function askSimAdv(names) {
+  const keep = h('input', { type: 'checkbox' });
+  const r = await dialog({ title: 'Erweiterte Bauteile', body: [
+    h('p', {}, 'Die Schaltung enthält Bauteile, die mit vereinfachten Modellen berechnet werden: ' + names.join(', ') + '.'),
+    h('p', { class: 'muted' }, 'Die Ergebnisse zeigen das typische Verhalten, sind aber keine genaue Bauteilsimulation.'),
+    h('label', { class: 'chk' }, keep, ' Nicht mehr fragen (in den Einstellungen änderbar)')],
+    buttons: [{ label: 'Abbrechen', value: null }, { label: 'Ohne diese Bauteile', value: false }, { label: 'Mitsimulieren', primary: true, value: true }] });
+  if (r != null && keep.checked) changeSetting('simAdv', r ? 'yes' : 'no');
+  return r;
+}
+function startSim2() {
   SIM.on = true; SIM.run = true; SIM.t = 0; SIM.dirty = true; SIM.traces = []; SIM.phase.clear(); SIM.last = performance.now();
   rebuildSim(true); SIM.speed = autoSpeed();
   if (!SIM.net || !SIM.net.els.length) { toast('Keine simulierbare Schaltung gefunden. Bauteile mit Leitungen verbinden (Taste W).', 5000); SIM.on = false; return; }
@@ -326,16 +411,16 @@ function drawSim(c, z) {
       c.globalAlpha = Math.min(0.9, 0.25 + 0.6 * k); c.fillStyle = g; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.fill(); c.globalAlpha = 1;
     }
     if (e.meas != null) {
-      const t = fmtSI(e.meas, e.type === 'AM' ? 'A' : 'V'); c.font = `600 ${15}px ${FONT}`; const tw = c.measureText(t).width, y0 = objBounds(e.o)[3] + 8;
+      const t = e.unit === 'Ω' && Math.abs(e.meas) > 1e8 ? '∞ Ω' : fmtSI(e.meas, e.unit || (e.type === 'AM' ? 'A' : 'V')); c.font = `600 ${15}px ${FONT}`; const tw = c.measureText(t).width, y0 = objBounds(e.o)[3] + 8;
       c.fillStyle = themeDark() ? 'rgba(20,22,26,.9)' : 'rgba(255,255,255,.95)'; c.fillRect(cx - tw / 2 - 6, y0, tw + 12, 22);
       c.strokeStyle = '#2563eb'; c.lineWidth = 1; c.strokeRect(cx - tw / 2 - 6, y0, tw + 12, 22);
       c.fillStyle = '#2563eb'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(t, cx, y0 + 11);
       c.fillStyle = '#facc15';
     }
-    if (e.type === 'GATE') {                              // Logikpegel an Ein- und Ausgängen
-      const one = e.keys.length === 2, sym = SYM[e.o.sym];
+    if (e.type === 'GATE' || e.type === 'DFF' || e.type === 'SRFF') {   // Logikpegel an Ein- und Ausgängen
+      const one = e.keys.length === 2, ff = e.type !== 'GATE', sym = SYM[e.o.sym];
       e.keys.forEach((k, i) => {
-        const isOut = i === (one ? 1 : 2), [px, py] = sym.pins[i], bit = isOut ? e.st.out : V(e.n[i]) > 2.5 ? 1 : 0;
+        const isOut = ff ? i >= 2 : i === (one ? 1 : 2), [px, py] = sym.pins[i], bit = ff && isOut ? (i === 2 ? e.st.q : 1 - e.st.q) : isOut ? e.st.out : V(e.n[i]) > 2.5 ? 1 : 0;
         const [bx, by] = fromLocal(e.o, (px / sym.w - 0.5) * e.o.w + (isOut ? -12 : 12), (py / sym.h - 0.5) * e.o.h - 11);
         logicBadge(c, bx, by, bit, false);
       });
@@ -374,7 +459,7 @@ function simClick(p) {                                     // während der Simul
 
 /* ---------- Oszilloskop ---------- */
 const TRACE_COLS = ['#16a34a', '#2563eb', '#dc2626', '#d97706', '#9333ea', '#0891b2'];
-function newTrace(o, q) { const k = SIM.traces.length; return { o, q, col: TRACE_COLS[k % TRACE_COLS.length], data: [], name: (o.label && !/\$/.test(o.label) ? o.label : SYM[o.sym].name) + (q === 'I' ? ' (Strom)' : ' (Spannung)') }; }
+function newTrace(o, q) { const k = SIM.traces.length; return { o, q, col: TRACE_COLS[k % TRACE_COLS.length], data: [], name: (o.label && !/\$/.test(o.label) ? o.label : tr(SYM[o.sym].name)) + tr(q === 'I' ? ' (Strom)' : ' (Spannung)') }; }
 function traceValue(tr) {
   const e = SIM.net && SIM.net.els.find(x => x.o === tr.o); if (!e) return NaN;
   if (tr.q === 'I') return e.Ipins ? e.Ipins[0] : NaN;
@@ -406,7 +491,7 @@ function drawScope() {
     const last = tr.data.length ? tr.data[tr.data.length - 1][1] : NaN, unit = tr.q === 'I' ? 'A' : 'V';
     leg.push(`<span style="color:${tr.col}">● ${tr.name}: <b>${fmtSI(last, unit)}</b> <small>(max ${fmtSI(mx, unit)})</small></span>`);
   }
-  c.fillStyle = '#94a3b8'; c.font = `11px ${FONT}`; c.fillText(fmtSI(win / 10, 's') + ' / Teil', 6, H - 6);
+  c.fillStyle = '#94a3b8'; c.font = `11px ${FONT}`; c.fillText(fmtSI(win / 10, 's') + tr(' / Teil'), 6, H - 6);
   $('#scopeleg').innerHTML = leg.join('');
 }
 

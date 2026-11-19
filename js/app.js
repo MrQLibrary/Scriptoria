@@ -58,7 +58,7 @@ function showEditor() {
 }
 function newProject() {
   const now = Date.now();
-  loadIntoEditor({ id: uid(), name: 'Unbenanntes Whiteboard', created: now, modified: now }, { objs: [] });
+  loadIntoEditor({ id: uid(), name: tr('Unbenanntes Whiteboard'), created: now, modified: now }, { objs: [] });
   S.dirty = true; doSave(true);
 }
 async function openProject(id) {
@@ -78,7 +78,7 @@ async function goHome() {
   S.screen = 'home'; $('#editor').hidden = true; $('#home').hidden = false; $('#elec').hidden = true; document.body.classList.remove('in-editor');
   applyTheme(); renderHome();
 }
-function renameProject(name) { name = (name || '').trim() || 'Unbenanntes Whiteboard'; if (S.project) { S.project.name = name; markDirty(); } }
+function renameProject(name) { name = (name || '').trim() || tr('Unbenanntes Whiteboard'); if (S.project) { S.project.name = name; markDirty(); } }
 
 /* Automatisches Speichern: kurz nach jeder Änderung, beim Verlassen der Seite und beim Wechsel in einen anderen Tab/ein anderes Fenster. */
 let saveTimer = null, saveChain = Promise.resolve();
@@ -132,7 +132,7 @@ async function saveFile(saveAs) {
 async function importProjectText(text, path) {
   let data; try { data = JSON.parse(text); } catch (e) { toast('Das ist keine gültige Whiteboard-Datei.'); return; }
   if (!data || !(Array.isArray(data.objs) || Array.isArray(data.pages))) { toast('Das ist keine gültige Whiteboard-Datei.'); return; }
-  const now = Date.now(), name = data.name || (path ? path.split(/[\\/]/).pop().replace(/\.owb$/i, '') : 'Importiertes Whiteboard');
+  const now = Date.now(), name = data.name || (path ? path.split(/[\\/]/).pop().replace(/\.owb$/i, '') : tr('Importiertes Whiteboard'));
   loadIntoEditor({ id: uid(), name, created: data.created || now, modified: now, filePath: path || null }, data);
   S.dirty = true; await doSave(true);
 }
@@ -313,11 +313,11 @@ async function exportPDF({ format, onlySel, allPages }) {
 async function renderHome() {
   const grid = $('#h-grid'), list = await listSorted();
   $('#h-empty').hidden = list.length > 0; $('#h-title').hidden = list.length === 0;
-  const fmt = t => new Date(t).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const fmt = t => new Date(t).toLocaleString(LOCALE, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const cards = list.map(m => {
     const more = h('button', { class: 'more', title: 'Mehr', onclick: e => { e.stopPropagation(); popupMenu(e.currentTarget, [
       { label: 'Öffnen', run: () => openProject(m.id) }, { label: 'Umbenennen …', run: async () => { const n = await askText('Umbenennen', 'Neuer Name', m.name, 'Umbenennen'); if (n) await rewriteProject(m.id, d => { d.name = n; }); } },
-      { label: 'Duplizieren', run: () => rewriteProject(m.id, d => { d.name += ' (Kopie)'; }, true) }, { label: 'Als Datei speichern (.owb) …', run: () => exportLibraryFile(m) }, '-',
+      { label: 'Duplizieren', run: () => rewriteProject(m.id, d => { d.name += tr(' (Kopie)'); }, true) }, { label: 'Als Datei speichern (.owb) …', run: () => exportLibraryFile(m) }, '-',
       { label: 'Löschen …', run: async () => { if (await confirmDlg('Whiteboard löschen', `„${m.name}“ wirklich löschen? Das lässt sich nicht rückgängig machen.`, 'Löschen', true)) { await api.deleteProject(m.id); renderHome(); } } }]); } }, '⋯');
     return h('div', { class: 'card', onclick: () => openProject(m.id) }, h('div', { class: 'th', style: m.thumb ? `background-image:url(${m.thumb})` : '' }, m.thumb ? '' : '▭'),
       h('div', { class: 'meta' }, h('div', { class: 'nm', title: m.name }, m.name), h('div', { class: 'dt' }, 'Geändert: ' + fmt(m.modified))), more);

@@ -137,11 +137,15 @@ function buildTimer() {
 /* ======================================================================
    Formel-Auswertung ohne eval (sicher, funktioniert mit strenger Content-Security-Policy)
    ====================================================================== */
-function parseExpr(src) {
+function parseExpr(src, opt = {}) {
   const s = src.replace(/,/g, '.').replace(/\s+/g, '').replace(/·|⋅|×/g, '*').replace(/π/g, 'pi').replace(/√/g, 'sqrt').replace(/²/g, '^2').replace(/³/g, '^3').toLowerCase();
   let i = 0;
   const FN = { sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos, atan: Math.atan, sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh,
-    exp: Math.exp, ln: Math.log, log: Math.log10, lg: Math.log10, sqrt: Math.sqrt, wurzel: Math.sqrt, abs: Math.abs, sgn: Math.sign, sign: Math.sign };
+    exp: Math.exp, ln: Math.log, log: Math.log10, lg: Math.log10, sqrt: Math.sqrt, wurzel: Math.sqrt, abs: Math.abs, sgn: Math.sign, sign: Math.sign,
+    floor: Math.floor, ceil: Math.ceil, round: Math.round, frac: v => v - Math.floor(v), max0: v => Math.max(0, v), cbrt: Math.cbrt, asinh: Math.asinh, acosh: Math.acosh, atanh: Math.atanh };
+  if (opt.deg) { const d = Math.PI / 180; Object.assign(FN, { sin: v => Math.sin(v * d), cos: v => Math.cos(v * d), tan: v => Math.tan(v * d), asin: v => Math.asin(v) / d, acos: v => Math.acos(v) / d, atan: v => Math.atan(v) / d }); }
+  const VARS = opt.vars || {};
+  const fact = n => { if (n < 0 || n !== Math.floor(n)) return NaN; let r = 1; for (let k = 2; k <= n && r < Infinity; k++) r *= k; return r; };
   const C = { pi: () => Math.PI, e: () => Math.E }, FNS = Object.keys(FN).sort((a, b) => b.length - a.length);
   const peek = () => s[i], eat = c => { if (s[i] === c) { i++; return true; } return false; };
   function expr() { let f = term(); for (;;) { if (eat('+')) { const a = f, b = term(); f = v => a(v) + b(v); } else if (eat('-')) { const a = f, b = term(); f = v => a(v) - b(v); } else return f; } }
@@ -150,7 +154,7 @@ function parseExpr(src) {
     else if (peek() && /[a-z0-9(.]/.test(peek())) { const a = f, b = unary(); f = v => a(v) * b(v); }     // 2x, 3sin(x), (x+1)(x-1)
     else return f; } }
   function unary() { if (eat('-')) { const a = unary(); return v => -a(v); } if (eat('+')) return unary(); return power(); }
-  function power() { const b = atom(); if (eat('^')) { const e = unary(); return v => Math.pow(b(v), e(v)); } return b; }
+  function power() { let b = atom(); while (eat('!')) { const a = b; b = v => fact(a(v)); } if (eat('^')) { const e = unary(); return v => Math.pow(b(v), e(v)); } return b; }
   function atom() {
     if (eat('(')) { const f = expr(); if (!eat(')')) throw new Error('„)“ fehlt'); return f; }
     const m = /^(\d+\.?\d*|\.\d+)(e[+-]?\d+)?/.exec(s.slice(i)); if (m) { i += m[0].length; const n = parseFloat(m[0]); return () => n; }
@@ -158,6 +162,7 @@ function parseExpr(src) {
     const id = w[0];
     for (const k of FNS) if (id.startsWith(k)) { i += k.length; const fn = FN[k], arg = s[i] === '(' ? atom() : power(); return v => fn(arg(v)); }
     if (id.startsWith('pi')) { i += 2; return C.pi; }
+    for (const k of Object.keys(VARS).sort((a, b) => b.length - a.length)) if (id.startsWith(k)) { i += k.length; const val = VARS[k]; return () => val; }
     i += 1;
     if (id[0] === 'x' || id[0] === 't') return v => v;
     if (id[0] === 'e') return C.e;

@@ -50,8 +50,8 @@ const S = {
   armed: null, armedRot: 0,      // gewähltes Symbol (Elektronik)
   laser: { pts: [], active: false, color: '#ff2d2d' },
   editing: null,
-  settings: { theme: 'system', electronics: true, grid: true, snap: false, gridSize: 10, pxPerCm: 96 / 2.54, historic: false, histPure: false, hints: true, pressure: true, shapes: true, pdfMode: 'ask', pdfCols: 1,
-    tools: { ruler: true, geo: true, compass: true, parab: true, laser: true, plot: false, phasor: false, diagram: false, timer: false }, gridType: 'dots', gridWeight: 'mittel', appIcon: 'board' },
+  settings: { theme: 'system', electronics: true, grid: true, snap: false, gridSize: 10, pxPerCm: 96 / 2.54, historic: false, histPure: false, hints: true, pressure: true, shapes: true, pdfMode: 'ask', pdfCols: 1, simAdv: 'ask', lang: 'de',
+    tools: { ruler: true, geo: true, compass: true, parab: true, laser: true, plot: false, phasor: false, diagram: false, timer: false, fourier: false, calc: false }, gridType: 'dots', gridWeight: 'mittel', appIcon: 'board' },
   bg: null, tplIdx: 0, tablet: 0, eraserSkin: null,
   ui: { hidePanels: false, propsCollapsed: false },
   dirty: false, lastThumb: 0

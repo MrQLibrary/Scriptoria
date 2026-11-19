@@ -78,6 +78,7 @@ function openSettings() {
   const tog = (key, label, desc) => switchRow(label, desc, S.settings.tools[key] !== false, v => { S.settings.tools = { ...S.settings.tools, [key]: v }; changeSetting('tools', S.settings.tools); });
   const body = [
     h('input', { class: 'search', type: 'search', placeholder: 'Einstellung suchen …', oninput: e => filterSettings(e.target) }),
+    h('div', { class: 'frow' }, h('label', {}, 'Sprache / Language'), h('select', { onchange: e => setLanguage(e.target.value) }, ...LANGS.map(([k, l]) => h('option', { value: k, selected: k === LANG }, l)))),
     h('h3', {}, 'Darstellung'), seg,
     h('div', { class: 'frow', style: 'display:block' }, h('label', {}, 'App-Symbol'), iconPicker(),
       hint('Gilt sofort für Tab und Startbildschirm. Für die installierte App muss Scriptoria aus Edge neu installiert werden (siehe ⓘ Hilfe → Ansicht).')),
@@ -95,9 +96,11 @@ function openSettings() {
     h('div', { class: 'frow' }, h('label', {}, 'PDF-Seiten nebeneinander'), segSetting('pdfCols', [['1', 1], ['2', 2], ['3', 3], ['4', 4]])),
     h('h3', {}, 'Werkzeuge in der Leiste'),
     tog('ruler', 'Lineal'), tog('geo', 'Geodreieck'), tog('compass', 'Zirkel'), tog('parab', 'Parabel'), tog('laser', 'Laserpointer'),
-    tog('plot', 'Funktionsplotter & Koordinatensystem'), tog('phasor', 'Zeigerdiagramm'), tog('diagram', 'Diagramm-Vorlagen', 'Bode-Diagramm, Oszilloskop-Raster, Kennlinienfeld …'), tog('timer', 'Stoppuhr'),
+    tog('plot', 'Funktionsplotter & Koordinatensystem'), tog('phasor', 'Zeigerdiagramm'), tog('diagram', 'Diagramm-Vorlagen', 'Bode-Diagramm, Oszilloskop-Raster, Kennlinienfeld …'), tog('timer', 'Stoppuhr'), tog('fourier', 'Petit Fourier', 'Fourier-Reihe einer Funktion: Frequenzen, Amplituden und Phasen.'), tog('calc', 'Wissenschaftlicher Taschenrechner'),
     h('h3', {}, 'Elektronik'),
     switchRow('Elektronik-Baukasten', 'Bauteile, Schaltungen und Leitungswerkzeug.', S.settings.electronics, v => changeSetting('electronics', v)),
+    h('div', { class: 'frow' }, h('label', {}, 'Erweiterte Bauteile simulieren'), segSetting('simAdv', [['Fragen', 'ask'], ['Immer', 'yes'], ['Nie', 'no']])),
+    hint('Thyristor, TRIAC, MOSFET, JFET, Transformator, Flipflops u. a. werden mit vereinfachten Modellen berechnet.'),
     h('h3', {}, 'Historische Tafeln'),
     switchRow('Historische Vorlagen', 'Kreidetafel, Papyrus, Wachstafel, Sandtafel, Tontafel, Schiefertafel und Pergament anbieten.', S.settings.historic, v => changeSetting('historic', v)),
     switchRow('Nur historische Werkzeuge', 'Moderne Werkzeuge auf historischen Tafeln ausblenden.', S.settings.histPure, v => changeSetting('histPure', v)),
@@ -124,7 +127,12 @@ function openElecHelp() {
   "fills": [],
   "texts": [{ "t": "R", "x": 40, "y": 21, "s": 14 }]
 }`;
-  const body = h('div', { html: `
+  const E = (typeof HELP_L10N !== 'undefined' && HELP_L10N[LANG + ':elec']) || elecHelpDE;
+  const body = h('div', { html: E(sym) });
+  return dialog({ title: 'Anleitung: Elektronik-Baukasten', body, wide: true, buttons: [{ label: 'Schließen', primary: true, value: true }] });
+}
+function elecHelpDE(sym) {
+  return `
 <h3>1. Bauteile einfügen</h3>
 <p>Öffnen Sie mit dem Chip-Symbol in der linken Leiste (Taste <code>B</code>) den Baukasten. Wählen Sie ein Bauteil und klicken Sie auf die Fläche – es bleibt ausgewählt, Sie können mehrere setzen. Mit <code>Q</code> drehen Sie es vor dem Platzieren um 90°, <code>Esc</code> beendet das Platzieren. Schalten Sie in den Einstellungen oder oben in der Leiste <b>Raster einrasten</b> ein, dann treffen sich die Anschlüsse exakt.</p>
 <h3>2. Verbinden</h3>
@@ -145,8 +153,7 @@ function openElecHelp() {
 </ul>
 <p>Tipp: Pfade können Sie in jedem SVG-Editor (z. B. Inkscape) zeichnen und die <code>d</code>-Werte hier einfügen.</p>
 <h3>Tastenkürzel</h3>
-<p><code>V</code> Auswahl · <code>H</code> Hand · <code>P</code> Stift · <code>E</code> Radierer · <code>L</code> Linie · <code>A</code> Pfeil · <code>R</code> Rechteck · <code>O</code> Ellipse · <code>T</code> Text · <code>N</code> Notiz · <code>C</code> Zirkel · <code>J</code> Laserpointer · <code>U</code> Lineal · <code>B</code> Baukasten · <code>Q</code> 90° drehen · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern</p>` });
-  return dialog({ title: 'Anleitung: Elektronik-Baukasten', body, wide: true, buttons: [{ label: 'Schließen', primary: true, value: true }] });
+<p><code>V</code> Auswahl · <code>H</code> Hand · <code>P</code> Stift · <code>E</code> Radierer · <code>L</code> Linie · <code>A</code> Pfeil · <code>R</code> Rechteck · <code>O</code> Ellipse · <code>T</code> Text · <code>N</code> Notiz · <code>C</code> Zirkel · <code>J</code> Laserpointer · <code>U</code> Lineal · <code>B</code> Baukasten · <code>Q</code> 90° drehen · Strg+Z/Y Rückgängig/Wiederholen · Strg+S Speichern</p>`;
 }
 
 /* ---------- PDF-Export ---------- */
@@ -165,9 +172,12 @@ function openPdfExport() {
 
 /* ---------- Hilfe: alle Funktionen auf einen Blick ---------- */
 function openHelp() {
-  const k = s => `<code>${s}</code>`;
-  const body = h('div', { class: 'help', html: `
-<input class="search" type="search" placeholder="In der Hilfe suchen …">
+  const k = s => `<code>${s}</code>`, H = (typeof HELP_L10N !== 'undefined' && HELP_L10N[LANG]) || helpDE;
+  const body = h('div', { class: 'help', html: `<input class="search" type="search" placeholder="${tr('In der Hilfe suchen …')}">` + H(k) });
+  return finishHelp(body);
+}
+function helpDE(k) {
+  return `
 <p>Scriptoria ist ein digitales Whiteboard für Vorlesung und Unterricht. Es läuft im Browser, funktioniert nach dem ersten Laden auch ohne Internet und speichert alles automatisch.</p>
 <nav class="toc">${['Start & Speichern', 'PDF & Seiten', 'Stifte & Radierer', 'Formen, Text & Notizen', 'Formeln (LaTeX)', 'Zeichengeräte', 'Elektronik', 'Präsentieren', 'Historische Tafeln', 'Ansicht', 'Zusatzwerkzeuge', 'Tastenkürzel'].map((t, i) => `<a href="#hs${i}">${t}</a>`).join('')}</nav>
 
@@ -220,6 +230,7 @@ function openHelp() {
 <li><b>Leitung ziehen</b> ${k('W')}: Am Anschluss klicken, Eckpunkte setzen – die Leitung verläuft rechtwinklig und endet automatisch an einem Anschluss oder einer anderen Leitung. Knotenpunkte an Abzweigungen werden selbst gesetzt. Doppelklick, Rechtsklick oder ${k('Esc')} beendet.</li>
 <li>Beschriftungen von Bauteilen (rechts im Feld „Beschriftung“) dürfen Formeln enthalten, z. B. ${k('$R_1 = 10\\,\\mathrm{k\\Omega}$')}.</li>
 <li><b>Simulieren</b> (▶ in der Werkzeugleiste oder im Baukasten): Die gezeichnete Schaltung wird berechnet – wie beim Falstad-Simulator. Gelbe Punkte zeigen den Strom, die Farbe der Leitungen die Spannung (grün positiv, rot negativ). Amperemeter und Voltmeter zeigen ihren Wert und erscheinen im <b>Oszilloskop</b>. Ein Klick auf ein Bauteil nimmt seine Spannung ins Oszilloskop auf, ein Klick auf einen Schalter legt ihn um (auch in der Zeichnung), ein Taster schließt, solange er gedrückt wird, und am Potentiometer setzt der Klick den Schleifer. <b>Logikschaltungen:</b> An allen Gatter-Ein- und -Ausgängen steht der Pegel 0 oder 1 (grün = 1). Anschlüsse (○), die nur Gatter-Eingänge speisen, sind Eingänge: Antippen schaltet zwischen 0 und 1. Anschlüsse an Gatter-Ausgängen zeigen das Ergebnis. Werte wie ${k('4,7 kΩ')}, ${k('100 µF')} oder ${k('10 V 50 Hz')} stehen rechts unter „Wert“. Simuliert werden Widerstände, Kondensatoren, Spulen, Quellen, Dioden, LEDs, Z-Dioden, Transistoren (NPN/PNP), Operationsverstärker, Logikgatter, Schalter, Lampen und Messgeräte. Änderungen an der Schaltung wirken sofort.</li>
+<li><b>Erweiterte Bauteile:</b> Thyristor, TRIAC, DIAC, MOSFET, JFET, Transformator (Wert z. B. ${k('10:1')} oder ${k('230 V / 12 V')}), Quarz, Fototransistor, Optokoppler, Solarzelle, gesteuerte Quellen, Leistungs- und Ohmmeter sowie D- und RS-Flipflop werden mit vereinfachten Modellen berechnet. Beim Start fragt Scriptoria, ob sie mitsimuliert werden sollen (Einstellung „Erweiterte Bauteile simulieren“: Fragen, Immer, Nie). Der Thyristor zündet bei Gatestrom über 1 mA und bleibt leitend, bis der Strom unter 1 mA fällt; der D-Flipflop übernimmt D bei steigender Taktflanke.</li>
 <li>Eigene Schaltungen speichern: alles markieren, „Als Schaltung speichern …“. Eigene Symbole lassen sich als JSON-Datei importieren – siehe „Anleitung“ im Baukasten.</li>
 </ul>
 
@@ -229,7 +240,7 @@ function openHelp() {
 <li><b>Laserpointer</b> ${k('J')}: Der Punkt folgt der Maus mit kurzer, auslaufender Spur. Es wird nichts gespeichert.</li>
 <li><b>Leisten ausblenden</b> (Symbol unten links oder ${k('Tab')}): die ganze Fläche zum Schreiben. Werkzeuge bleiben über Tasten erreichbar.</li>
 <li><b>Vollbild</b> (Symbol unten links oder ${k('F')}).</li>
-<li>Die Werkzeugleiste links und die Eigenschaften-Leiste rechts lassen sich mit dem kleinen Pfeil oben minimieren. Links bleiben dann Hand, Stift und Radierer.</li>
+<li>Die Werkzeugleiste links und die Eigenschaften-Leiste rechts lassen sich mit dem kleinen Pfeil oben minimieren. Links bleiben dann Hand, Stift und Radierer. Passen nicht alle Werkzeuge auf den Bildschirm, scrollt die Leiste mit dem Mausrad; ein Schatten am Rand zeigt weitere Werkzeuge an.</li>
 </ul>
 
 <h3 id="hs8">Historische Tafeln</h3>
@@ -251,6 +262,7 @@ function openHelp() {
 <li>Mausrad scrollt, ${k('Strg')} + Mausrad zoomt; auf Touch-Geräten mit zwei Fingern. Hand-Werkzeug ${k('H')} oder gedrückte ${k('Leertaste')} verschiebt die Ansicht.</li>
 <li>Unten links: „Alles anzeigen“, Zoom, Klick auf die Prozentzahl setzt auf 100 % zurück.</li>
 <li>Oben: Hilfslinien ein/aus, Einrasten am Raster, heller/dunkler Modus. In den Einstellungen wählen Sie die Art der Hilfslinien (Punkte, Karos oder Linien wie im Schreibheft) und ihre Stärke.</li>
+<li><b>Sprache:</b> In den Einstellungen ganz oben – Deutsch, English, Français, 中文, Русский, हिन्दी oder Latina. Die Seite lädt danach neu.</li>
 <li>Ebenfalls in den Einstellungen: das <b>App-Symbol</b> – Whiteboard (Standard), Elektrotechnik, Schriftrolle oder passend zu jeder historischen Tafel.</li>
 <li><b>App-Symbol der installierten App wechseln:</b> Der Browser übernimmt das Symbol nur bei der Installation. Damit ein neues Symbol in Startmenü und Taskleiste erscheint, muss Scriptoria in Edge neu installiert werden:
 <ol><li>Installierte App deinstallieren: im App-Fenster oben rechts auf ${k('…')} → „Scriptoria deinstallieren“ (oder ${k('edge://apps')} öffnen, bei Scriptoria ${k('…')} → „Deinstallieren“). Haken bei „Daten löschen“ <b>nicht</b> setzen, sonst gehen die Boards verloren.</li>
@@ -266,6 +278,8 @@ In Tab und Browser-Leiste gilt das neue Symbol sofort.</li>
 <li><b>Zeigerdiagramm:</b> Zeiger mit Betrag und Winkel (z. B. U und I) mit Re/Im-Achsen und Winkelbögen.</li>
 <li><b>Diagramm-Vorlagen:</b> leeres Koordinatensystem, leeres Zeigerdiagramm (Re/Im-Achsen mit Hilfskreisen zum Hineinzeichnen), Bode-Diagramm, Oszilloskop-Raster, Kennlinienfeld, logarithmisches Papier, Polarkoordinaten. Die <b>Achsenbeschriftungen</b> wählen Sie beim Einfügen frei, Formeln zwischen ${k('$…$')}.</li>
 <li><b>Stoppuhr</b> mit Countdown (1–20 min) für Übungsaufgaben.</li>
+<li><b>Petit Fourier:</b> Funktion f(t) und Periode T eingeben (z. B. ${k('sgn(sin(2*pi*t/T))')} oder ${k('sin(2*pi*50*t)')} mit T = ${k('20m')}); angezeigt werden Frequenzen, Amplituden Aₙ und Phasen φₙ der Harmonischen, das Amplitudenspektrum und die Summe der Harmonischen. Vorlagen: Rechteck, Dreieck, Sägezahn, Gleichrichtung u. a. „Spektrum ins Board“ fügt das Spektrum als Bild ein.</li>
+<li><b>Taschenrechner</b> (wissenschaftlich): Grundrechenarten, Potenzen, Wurzeln, sin/cos/tan und Umkehrfunktionen (DEG oder RAD), ln, log, n!, π, e, ${k('EXP')} für Zehnerpotenzen und ${k('Ans')} für das letzte Ergebnis. Auch per Tastatur bedienbar; „Einfügen“ setzt Rechnung und Ergebnis als Text aufs Board.</li>
 </ul>
 <p>Diagramme sind ein festes Objekt: verschieben, skalieren, löschen – aber nicht versehentlich zerlegen. Doppelklick (oder „Diagramm bearbeiten“) ändert Funktion, Bereich und Achsenbeschriftung. Mit dem Stift kann man direkt hineinzeichnen, auch Freihand-Kurven in ein leeres Koordinatensystem oder Zeiger in ein leeres Zeigerdiagramm (Diagramm-Vorlagen); der Radierer lässt das Diagramm selbst unberührt.</p>
 
@@ -279,7 +293,9 @@ In Tab und Browser-Leiste gilt das neue Symbol sofort.</li>
 <tr><td>${k('Bild ↑/↓')} Seite</td><td>${k('Tab')} Leisten</td><td>${k('F')} Vollbild</td><td>${k('Strg+Z')} Rückgängig</td><td>${k('Strg+Y')} Wiederholen</td></tr>
 <tr><td>${k('Strg+S')} Datei sichern</td><td>${k('Strg+A')} Alles wählen</td><td>${k('Entf')} Löschen</td><td>${k('Esc')} Abbrechen</td></tr>
 </table>
-<p class="muted">Scriptoria ist freie Software (MIT-Lizenz). Formelsatz: MathJax (Apache-Lizenz 2.0), PDF: pdf.js und jsPDF.</p>` });
+<p class="muted">Scriptoria ist freie Software (MIT-Lizenz). Formelsatz: MathJax (Apache-Lizenz 2.0), PDF: pdf.js und jsPDF.</p>`;
+}
+function finishHelp(body) {
   body.querySelector('input.search').addEventListener('input', e => {     // Hilfe durchsuchen
     const q = e.target.value.trim().toLowerCase();
     body.querySelectorAll('li, p, tr').forEach(el => { el.style.display = !q || el.textContent.toLowerCase().includes(q) ? '' : 'none'; });
