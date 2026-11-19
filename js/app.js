@@ -42,7 +42,7 @@ function projectJSON(withImgs = true) {
 }
 function loadIntoEditor(meta, data, storedImgs = {}) {
   S.project = { id: meta.id, name: meta.name, created: meta.created, modified: meta.modified, filePath: meta.filePath || null };
-  initPages(data); S.imgs = { ...(data.imgs || {}), ...storedImgs }; imgCache.clear();
+  initPages(data); S.imgs = { ...(data.imgs || {}), ...storedImgs }; clearImgCache();
   S.savedImgs = new Set(Object.keys(storedImgs)); S.bg = data.bg || null;
   if (data.ruler) Object.assign(S.ruler, data.ruler); S.geo.on = false; if (data.geo) Object.assign(S.geo, data.geo); S.wire = null;
   S.hist = []; S.fut = []; S.histSize = 0; S.sels = []; S.draft = null; S.dirty = false; S.editing = null; $('#ed').hidden = true;
@@ -158,11 +158,11 @@ async function openPdf(file) {
 async function renderPdfPages(pdf, each) {                // Seite für Seite: sofort sichtbar, wenig Speicher
   for (let i = 1; i <= pdf.numPages; i++) {
     toast(`PDF wird eingefügt … Seite ${i} von ${pdf.numPages}`, 60000);
-    const page = await pdf.getPage(i), s = Math.min(3, 1800 / page.getViewport({ scale: 1 }).width), v = page.getViewport({ scale: s });
+    const page = await pdf.getPage(i), s = Math.min(3, 1600 / page.getViewport({ scale: 1 }).width), v = page.getViewport({ scale: s });
     const c = document.createElement('canvas'); c.width = Math.ceil(v.width); c.height = Math.ceil(v.height);
     const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
     await page.render({ canvasContext: cx, viewport: v }).promise;
-    each({ src: c.toDataURL('image/jpeg', 0.9), w: c.width, h: c.height });
+    each({ src: c.toDataURL('image/jpeg', 0.88), w: c.width, h: c.height });
     page.cleanup(); c.width = c.height = 0;
   }
   pdf.destroy();
@@ -237,7 +237,7 @@ function makeThumb() {
   return t.toDataURL('image/jpeg', 0.75);
 }
 async function exportPNG() {
-  if (S.editing) commitEdit();
+  if (S.editing) commitEdit(); await loadImgsOf(S.objs.slice(0, MAX_FULL));
   const r = renderToCanvas(S.objs, { maxDim: 8000, scale: 2 }); if (!r) { toast('Das Whiteboard ist leer.'); return; }
   const out = await saveOut(S.project.name + '.png', r.cv.toDataURL('image/png').split(',')[1], { base64: true, filters: [{ name: 'PNG-Bild', extensions: ['png'] }], mime: 'image/png' });
   if (out) toast('PNG exportiert.');
@@ -246,7 +246,9 @@ async function exportPDFDialog() { if (S.editing) commitEdit(); const o = await 
 async function exportPDF({ format, onlySel, allPages }) {
   const lists = onlySel && S.sels.length ? [S.sels] : allPages ? (syncPage(), S.pages.map(pg => pg.objs).filter(l => l.length)) : [S.objs];
   const { jsPDF } = window.jspdf, mm = 25.4 / 96; let doc = null;
+  let pi = 0;
   for (const list of lists) {
+    toast(`PDF wird erstellt … Seite ${++pi} von ${lists.length}`, 60000); await loadImgsOf(list);
     const r = renderToCanvas(list, { maxDim: 4200, scale: 2.5 }); if (!r) continue;
     const img = r.cv.toDataURL('image/jpeg', 0.93);
     if (format === 'fit') {
@@ -261,6 +263,7 @@ async function exportPDF({ format, onlySel, allPages }) {
     }
     r.cv.width = r.cv.height = 0;
   }
+  toast(null);
   if (!doc) { toast('Das Whiteboard ist leer.'); return; }
   const b64 = doc.output('datauristring').split(',')[1];
   const out = await saveOut(S.project.name + '.pdf', b64, { base64: true, filters: [{ name: 'PDF-Dokument', extensions: ['pdf'] }], mime: 'application/pdf' });

@@ -198,8 +198,9 @@ function placeGroup(list, label) {                       // Gruppe in die Bildsc
 /* ======================================================================
    Funktionsplotter & Koordinatensystem
    ====================================================================== */
-async function openPlotDialog() {
-  const P = S.plotPrefs || (S.plotPrefs = { f: 'sin(x)', f2: '', x0: -6.3, x1: 6.3, y0: -1.5, y1: 1.5, cm: 1.5, grid: true, xl: 'x', yl: 'y' });
+async function openPlotDialog(edit) {
+  const P = edit ? { ...edit.spec } : (S.plotPrefs || (S.plotPrefs = { f: 'sin(x)', f2: '', x0: -6.3, x1: 6.3, y0: -1.5, y1: 1.5, cm: 1.5, grid: true, xl: 'x', yl: 'y' }));
+  delete P.kind;
   const inp = (v, w = '90px', type = 'text') => h('input', { type, value: v, style: `width:${w}` });
   const f = inp(P.f, '100%'), f2 = inp(P.f2, '100%'), x0 = inp(P.x0, '70px'), x1 = inp(P.x1, '70px'), y0 = inp(P.y0, '70px'), y1 = inp(P.y1, '70px'), cm = inp(P.cm, '70px'), xl = inp(P.xl, '60px'), yl = inp(P.yl, '60px');
   const grid = h('input', { type: 'checkbox', checked: P.grid }), err = h('p', { class: 'err' });
@@ -209,27 +210,15 @@ async function openPlotDialog() {
     h('div', { class: 'frow' }, h('label', {}, 'x von … bis'), x0, x1), h('div', { class: 'frow' }, h('label', {}, 'y von … bis'), y0, y1),
     h('div', { class: 'frow' }, h('label', {}, 'cm pro Einheit'), cm), h('div', { class: 'frow' }, h('label', {}, 'Achsen'), xl, yl),
     h('label', { class: 'chk' }, grid, ' Gitterlinien'), err];
-  const ok = await dialog({ title: 'Funktionsplotter', body, buttons: [{ label: 'Abbrechen', value: null }, { label: 'Einfügen', primary: true, value: true }],
+  const ok = await dialog({ title: edit ? 'Diagramm bearbeiten' : 'Funktionsplotter', body, buttons: [{ label: 'Abbrechen', value: null }, { label: edit ? 'Übernehmen' : 'Einfügen', primary: true, value: true }],
     onOpen: (dlg, close) => { const old = dlg.querySelector('.btn.primary'), btn = old.cloneNode(true); old.replaceWith(btn); btn.onclick = () => { try { buildPlot(); close(true); } catch (x) { err.textContent = x.message; } }; } });
   function buildPlot() {
     const num = el => { const v = parseFloat(String(el.value).replace(',', '.')); if (!isFinite(v)) throw new Error('Bitte gültige Zahlen eingeben.'); return v; };
     Object.assign(P, { f: f.value, f2: f2.value, x0: num(x0), x1: num(x1), y0: num(y0), y1: num(y1), cm: num(cm), grid: grid.checked, xl: xl.value, yl: yl.value });
     if (P.x1 <= P.x0 || P.y1 <= P.y0) throw new Error('„bis“ muss größer als „von“ sein.');
-    const fns = [P.f, P.f2].filter(s => s.trim()).map(s => ({ src: s, fn: parseExpr(s) })), U = P.cm * S.settings.pxPerCm;
-    const list = axesObjs({ x0: P.x0, x1: P.x1, y0: P.y0, y1: P.y1, U, xl: P.xl || 'x', yl: P.yl || 'y', grid: P.grid });
-    const colors = ['#2563eb', '#dc2626'];
-    fns.forEach(({ fn }, k) => {
-      const N = 600, span = P.y1 - P.y0; let run = [];
-      const flush = () => { if (run.length > 1) list.push({ type: 'pen', kind: 'plain', pts: run, c: colors[k], w: 2.6, ls: 'solid' }); run = []; };
-      let prev = null;
-      for (let i = 0; i <= N; i++) {
-        const x = P.x0 + (P.x1 - P.x0) * i / N, y = fn(x);
-        if (!isFinite(y) || y < P.y0 - span || y > P.y1 + span || (prev != null && Math.abs(y - prev) > span)) { flush(); prev = isFinite(y) ? y : null; continue; }
-        run.push([x * U, -Math.max(P.y0 - 0.02 * span, Math.min(P.y1 + 0.02 * span, y)) * U]); prev = y;
-      }
-      flush();
-    });
-    placeGroup(list, fns.length ? 'Graph' : 'Koordinatensystem');
+    [P.f, P.f2].filter(s => s.trim()).forEach(parseExpr);            // Fehler sofort im Dialog anzeigen
+    const spec = { kind: 'plot', ...P };
+    if (edit) replaceGraph(edit, spec); else placeGraph(spec, P.f.trim() || P.f2.trim() ? 'Graph' : 'Koordinatensystem');
   }
   return ok;
 }
@@ -237,47 +226,106 @@ async function openPlotDialog() {
 /* ======================================================================
    Zeigerdiagramm (komplexe Zeiger mit Betrag und Winkel)
    ====================================================================== */
-async function openPhasorDialog() {
-  const rows = S.phasorPrefs || (S.phasorPrefs = [{ n: 'U', m: 230, a: 0 }, { n: 'I', m: 2, a: -30 }]);
-  const tbl = h('div', { class: 'ptbl' }), scale = h('input', { type: 'text', value: '4', style: 'width:70px' }), axes = h('input', { type: 'checkbox', checked: true }), arcs = h('input', { type: 'checkbox', checked: true });
+async function openPhasorDialog(edit) {
+  const rows = edit ? edit.spec.rows.map(r => ({ ...r })) : (S.phasorPrefs || (S.phasorPrefs = [{ n: 'U', m: 230, a: 0 }, { n: 'I', m: 2, a: -30 }]));
+  const sp = edit ? edit.spec : { scale: 4, axes: true, arcs: true };
+  const tbl = h('div', { class: 'ptbl' }), scale = h('input', { type: 'text', value: sp.scale, style: 'width:70px' }), axes = h('input', { type: 'checkbox', checked: sp.axes }), arcs = h('input', { type: 'checkbox', checked: sp.arcs });
   const draw = () => tbl.replaceChildren(h('div', { class: 'ph' }, h('span', {}, 'Name'), h('span', {}, 'Betrag'), h('span', {}, 'Winkel in °'), h('span', {})),
     ...rows.map((r, i) => h('div', { class: 'pr' },
       h('input', { value: r.n, oninput: e => r.n = e.target.value }), h('input', { value: r.m, oninput: e => r.m = e.target.value }), h('input', { value: r.a, oninput: e => r.a = e.target.value }),
       h('button', { class: 'tb', title: 'Entfernen', onclick: () => { rows.splice(i, 1); draw(); } }, '✕'))),
     h('button', { class: 'btn sm', onclick: () => { rows.push({ n: 'Z', m: 1, a: 45 }); draw(); } }, '+ Zeiger'));
   draw();
-  const ok = await dialog({ title: 'Zeigerdiagramm', body: [tbl, hint('Jeder Zeiger wird auf seinen größten Wert normiert, damit Spannungen und Ströme gemeinsam sichtbar sind.'),
+  const ok = await dialog({ title: 'Zeigerdiagramm', body: [tbl, hint('Zeiger gleicher Art (z. B. alle U) werden gemeinsam skaliert.'),
     h('div', { class: 'frow' }, h('label', {}, 'Länge des längsten Zeigers (cm)'), scale), h('label', { class: 'chk' }, axes, ' Re/Im-Achsen'), h('label', { class: 'chk' }, arcs, ' Winkel einzeichnen')],
-    buttons: [{ label: 'Abbrechen', value: null }, { label: 'Einfügen', primary: true, value: true }] });
+    buttons: [{ label: 'Abbrechen', value: null }, { label: edit ? 'Übernehmen' : 'Einfügen', primary: true, value: true }] });
   if (!ok) return;
-  const num = v => parseFloat(String(v).replace(',', '.')) || 0, L = (num(scale.value) || 4) * S.settings.pxPerCm, cols = ['#dc2626', '#2563eb', '#16a34a', '#9333ea', '#ea580c', '#0891b2'];
-  const groups = {}; rows.forEach(r => { const k = (r.n || '?').trim()[0].toUpperCase(); groups[k] = Math.max(groups[k] || 0, Math.abs(num(r.m))); });   // je Größenart normieren
+  const spec = { kind: 'phasor', rows: rows.map(r => ({ ...r })), scale: parseFloat(String(scale.value).replace(',', '.')) || 4, axes: axes.checked, arcs: arcs.checked };
+  if (edit) replaceGraph(edit, spec); else placeGraph(spec, 'Zeigerdiagramm');
+}
+function phasorPrims(sp) {
+  const num = v => parseFloat(String(v).replace(',', '.')) || 0, L = sp.scale * S.settings.pxPerCm, cols = ['#dc2626', '#2563eb', '#16a34a', '#9333ea', '#ea580c', '#0891b2'];
+  const groups = {}; sp.rows.forEach(r => { const k = (r.n || '?').trim()[0].toUpperCase(); groups[k] = Math.max(groups[k] || 0, Math.abs(num(r.m))); });
   const list = [];
-  if (axes.checked) list.push(G.arrow(-L * 1.15, 0, L * 1.25, 0, 1.6, '#6b7280'), G.arrow(0, L * 1.15, 0, -L * 1.25, 1.6, '#6b7280'), G.text(L * 1.25 + 18, 14, 'Re', 14, '#6b7280'), G.text(18, -L * 1.25 - 6, 'Im', 14, '#6b7280', 'left'));
-  rows.forEach((r, i) => {
+  if (sp.axes) list.push(G.arrow(-L * 1.15, 0, L * 1.25, 0, 1.6, '#6b7280'), G.arrow(0, L * 1.15, 0, -L * 1.25, 1.6, '#6b7280'), G.text(L * 1.25 + 18, 14, 'Re', 14, '#6b7280'), G.text(18, -L * 1.25 - 6, 'Im', 14, '#6b7280', 'left'));
+  sp.rows.forEach((r, i) => {
     const k = (r.n || '?').trim()[0].toUpperCase(), len = groups[k] ? L * Math.abs(num(r.m)) / groups[k] : 0, a = rad(num(r.a)), c = cols[i % cols.length];
     if (len < 1) return;
     const x = len * Math.cos(a), y = -len * Math.sin(a);
-    list.push(G.arrow(0, 0, x, y, 2.8, c));
-    list.push(G.text(x + 22 * Math.cos(a), y - 22 * Math.sin(a), '$\\underline{' + (r.n || '?').replace(/[{}\\$]/g, '') + '}$', 18, c));
-    if (arcs.checked && Math.abs(num(r.a)) > 0.5) {
-      const rr = 34 + i * 16, a0 = 0, sw = -a; list.push({ type: 'arc', cx: 0, cy: 0, r: rr, a0, sweep: sw, c, w: 1.4, ls: 'solid' });
+    list.push(G.arrow(0, 0, x, y, 2.8, c), G.text(x + 22 * Math.cos(a), y - 22 * Math.sin(a), '$\\underline{' + (r.n || '?').replace(/[{}\\$]/g, '') + '}$', 18, c));
+    if (sp.arcs && Math.abs(num(r.a)) > 0.5) {
+      const rr = 34 + i * 16; list.push({ type: 'arc', cx: 0, cy: 0, r: rr, a0: 0, sweep: -a, c, w: 1.4, ls: 'solid' });
       list.push(G.text((rr + 16) * Math.cos(-a / 2), (rr + 16) * Math.sin(-a / 2), fmtTick(num(r.a)) + '°', 12, c));
     }
   });
-  placeGroup(list, 'Zeigerdiagramm');
+  return list;
 }
+
+/* ======================================================================
+   Diagramme als EIN festes Objekt: lässt sich verschieben, skalieren, löschen – aber nicht zerlegen.
+   Doppelklick öffnet die Einstellungen erneut. Darauf schreiben geht wie auf jedem Hintergrund.
+   ====================================================================== */
+const GRAPH_CACHE = new Map();
+function plotPrims(P) {
+  const fns = [P.f, P.f2].filter(s => s && s.trim()).map(s => parseExpr(s)), U = P.cm * S.settings.pxPerCm;
+  const list = axesObjs({ x0: P.x0, x1: P.x1, y0: P.y0, y1: P.y1, U, xl: P.xl || 'x', yl: P.yl || 'y', grid: P.grid });
+  const colors = ['#2563eb', '#dc2626'];
+  fns.forEach((fn, k) => {
+    const N = 600, span = P.y1 - P.y0; let run = [], prev = null;
+    const flush = () => { if (run.length > 1) list.push({ type: 'pen', kind: 'plain', pts: run, c: colors[k], w: 2.6, ls: 'solid' }); run = []; };
+    for (let i = 0; i <= N; i++) {
+      const x = P.x0 + (P.x1 - P.x0) * i / N, y = fn(x);
+      const lo = P.y0 - 0.03 * span, hi = P.y1 + 0.03 * span;
+      if (!isFinite(y) || (prev != null && Math.abs(y - prev) > span)) { flush(); prev = isFinite(y) ? y : null; continue; }
+      if (y < lo || y > hi) {                              // außerhalb: bis zum Rand zeichnen, dann unterbrechen
+        if (run.length && prev != null) { const yb = y > hi ? hi : lo, xb = x - (P.x1 - P.x0) / N * (y - yb) / (y - prev); run.push([xb * U, -yb * U]); }
+        flush(); prev = y; continue;
+      }
+      if (!run.length && prev != null && (prev < lo || prev > hi)) { const yb = prev > hi ? hi : lo, xb = x - (P.x1 - P.x0) / N * (y - yb) / (y - prev); run.push([xb * U, -yb * U]); }
+      run.push([x * U, -y * U]); prev = y;
+    }
+    flush();
+  });
+  return list;
+}
+function graphPrims(spec) {
+  const key = JSON.stringify(spec); let g = GRAPH_CACHE.get(key); if (g) return g;
+  let prims;
+  try {
+    prims = spec.kind === 'plot' ? plotPrims(spec) : spec.kind === 'phasor' ? phasorPrims(spec) : spec.kind === 'bode' ? bodeObjs() : spec.kind === 'scope' ? scopeObjs()
+      : spec.kind === 'kenn' ? axesObjs({ x0: 0, x1: 10, y0: 0, y1: 10, U: S.settings.pxPerCm, xl: 'U / V', yl: 'I / mA' }) : spec.kind === 'log' ? logPaper(4, 9, 'f / Hz', '') : spec.kind === 'polar' ? polarObjs() : [];
+  } catch (e) { console.error(e); prims = []; }
+  const b = allBounds(prims) || [0, 0, 100, 100];
+  g = { prims, b }; GRAPH_CACHE.set(key, g); if (GRAPH_CACHE.size > 60) GRAPH_CACHE.delete(GRAPH_CACHE.keys().next().value);
+  return g;
+}
+function drawGraph(c, o) {
+  const { prims, b } = graphPrims(o.spec), bw = Math.max(1, b[2] - b[0]), bh = Math.max(1, b[3] - b[1]);
+  c.save(); c.scale(o.w / bw, o.h / bh); c.translate(-b[0], -b[1]); for (const p of prims) drawObj(c, p); c.restore();
+}
+function placeGraph(spec, label) {
+  const { b } = graphPrims(spec), w = b[2] - b[0], hh = b[3] - b[1], c = viewCenter(), pre = snapshot();
+  const o = { type: 'graph', x: c.x - w / 2, y: c.y - hh / 2, w, h: hh, rot: 0, spec };
+  S.objs.push(o); setTool('select'); S.sels = [o]; record(pre); refreshUI(); render();
+  if (label) hintToast(label + ' eingefügt – ein Objekt zum Verschieben und Skalieren. Doppelklick bearbeitet.', 3500);
+}
+function replaceGraph(o, spec) {
+  const pre = snapshot(), old = graphPrims(o.spec).b, k = o.w / Math.max(1, old[2] - old[0]), nb = graphPrims(spec).b;
+  o.spec = spec; o.w = (nb[2] - nb[0]) * k; o.h = (nb[3] - nb[1]) * k; record(pre); refreshUI(); render();
+}
+function editGraph(o) { if (o.spec.kind === 'plot') openPlotDialog(o); else if (o.spec.kind === 'phasor') openPhasorDialog(o); }
 
 /* ======================================================================
    Diagramm-Vorlagen: Bode-Diagramm, Oszilloskop-Raster, Kennlinienfeld, Polarkoordinaten
    ====================================================================== */
 function diagramMenu(anchor) {
   popupMenu(anchor, [
-    { label: 'Bode-Diagramm (Betrag und Phase)', run: () => placeGroup(bodeObjs(), 'Bode-Diagramm') },
-    { label: 'Oszilloskop-Raster (10 × 8 Teile)', run: () => placeGroup(scopeObjs(), 'Oszilloskop-Raster') },
-    { label: 'Kennlinienfeld I(U)', run: () => placeGroup(axesObjs({ x0: 0, x1: 10, y0: 0, y1: 10, U: S.settings.pxPerCm, xl: 'U / V', yl: 'I / mA' }), 'Kennlinienfeld') },
-    { label: 'Logarithmisches Papier (4 Dekaden)', run: () => placeGroup(logPaper(4, 9, 'f / Hz', ''), 'Log-Papier') },
-    { label: 'Polarkoordinaten', run: () => placeGroup(polarObjs(), 'Polarkoordinaten') }]);
+    { label: 'Leeres Koordinatensystem', run: () => placeGraph({ kind: 'plot', f: '', f2: '', x0: -5, x1: 5, y0: -4, y1: 4, cm: 1, grid: true, xl: 'x', yl: 'y' }, 'Koordinatensystem') },
+    { label: 'Bode-Diagramm (Betrag und Phase)', run: () => placeGraph({ kind: 'bode' }, 'Bode-Diagramm') },
+    { label: 'Oszilloskop-Raster (10 × 8 Teile)', run: () => placeGraph({ kind: 'scope' }, 'Oszilloskop-Raster') },
+    { label: 'Kennlinienfeld I(U)', run: () => placeGraph({ kind: 'kenn' }, 'Kennlinienfeld') },
+    { label: 'Logarithmisches Papier (4 Dekaden)', run: () => placeGraph({ kind: 'log' }, 'Log-Papier') },
+    { label: 'Polarkoordinaten', run: () => placeGraph({ kind: 'polar' }, 'Polarkoordinaten') }]);
 }
 function logPaper(dec, hCm, xl, yl, yTicks) {             // x logarithmisch, y linear
   const D = 3.2 * S.settings.pxPerCm, H = hCm * S.settings.pxPerCm, W = dec * D, out = [], gc = '#9aa3ad';

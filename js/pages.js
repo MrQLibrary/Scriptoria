@@ -14,7 +14,7 @@ function gotoPage(i) {
   if (S.editing) commitEdit(); if (S.wire) wireFinish();
   syncPage(); S.page = i; const pg = S.pages[i];
   S.objs = pg.objs; S.view = pg.view; S.hist = pg.hist || []; S.fut = pg.fut || []; S.histSize = pg.histSize || 0;
-  S.sels = []; S.draft = null; markDirty(); presentDirty(); if (window.syncHist) syncHist(); refreshUI(); render(); updateCursor();
+  S.sels = []; S.draft = null; markDirty(); presentDirty(); simDirty(); if (window.syncHist) syncHist(); refreshUI(); render(); updateCursor();
 }
 function addPage(objs = [], view) {
   syncPage(); S.pages.splice(S.page + 1, 0, { objs, view: view || emptyView(), hist: [], fut: [], histSize: 0 });

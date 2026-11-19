@@ -21,7 +21,7 @@ const HIST = {
   },
   wax: {
     name: 'Römische Wachstafel', era: 'Römisches Reich', desc: 'Gebundene Wachstafeln (Polyptychon) aus Holz. Mit der Spitze des Stilus schreiben, mit dem flachen Ende glätten – Taste D dreht den Stilus.', tex: 'table', objects: 'wax',
-    pens: [{ kind: 'stylus', name: 'Stilus – Spitze (D dreht)', color: '#d9b97b', width: 3 }, { kind: 'spatula', name: 'Stilus – flaches Ende (D dreht)', erase: 16 }],
+    pens: [{ kind: 'stylus', name: 'Stilus – Spitze zum Schreiben (D dreht)', color: '#c9a468', width: 3.5 }, { kind: 'spatula', name: 'Stilus – flaches Ende zum Glätten (D dreht)', erase: 16 }],
     flip: [0, 1],
     tools: { ruler: 'Regula – Lineal (U)', compass: 'Circinus – Zirkel (C)' }
   },
@@ -123,7 +123,8 @@ function texCanvas(id) {
   }
   TEX.set(id, cv); return cv;
 }
-const PAT = new WeakMap();
+let PAT = new WeakMap();
+function resetTextures() { TEX.clear(); CHALK.clear(); PAT = new WeakMap(); }   // nach Verlust der Grafikkarten-Daten neu erzeugen
 function pattern(c, id) {                                // Muster pro Zeichenfläche zwischenspeichern
   let m = PAT.get(c); if (!m) { m = new Map(); PAT.set(c, m); }
   let p = m.get(id); if (!p) { p = c.createPattern(texCanvas(id), 'repeat'); m.set(id, p); }
@@ -149,7 +150,9 @@ function drawBackground(c, d, v, opt) {
   const t = curTpl(); if (!t) return false;
   c.setTransform(d * v.z, 0, 0, d * v.z, d * v.x, d * v.y);
   const vr = viewRect(v, opt.w, opt.h, d);
-  c.fillStyle = pattern(c, t.tex); c.fillRect(vr[0], vr[1], vr[2] - vr[0], vr[3] - vr[1]);
+  const pat = pattern(c, t.tex);
+  if (pat.setTransform) pat.setTransform(new DOMMatrix([1 / v.z, 0, 0, 1 / v.z, 0, 0]));   // Struktur bleibt beim Zoomen gleich groß (kein Kachelmuster)
+  c.fillStyle = pat; c.fillRect(vr[0], vr[1], vr[2] - vr[0], vr[3] - vr[1]);
   if (t.objects === 'wax') drawWax(c);
   else if (t.objects === 'clay') drawClay(c);
   else if (t.objects === 'slate') drawSlate(c);
@@ -232,6 +235,15 @@ function groove(c, o, shadow, mid, hl) {                 // eingeritzte Rille: S
   const pass = (dx, col, a, lw) => { c.save(); c.translate(dx, dx); c.globalAlpha = a; c.strokeStyle = col; c.lineWidth = lw; smoothPath(c, p); c.stroke(); c.restore(); };
   pass(-off * 0.6, shadow, 0.75, w); pass(0, mid, 1, w * 0.78); pass(off * 0.55, hl, 0.55, Math.max(0.6, w * 0.28));
 }
+function waxGroove(c, o) {                                // Ritzspur im Wachs: aufgeworfener Rand, dunkle Kante, raue helle Rille
+  const p = o.pts, w = o.w; c.lineCap = 'round'; c.lineJoin = 'round';
+  const pass = (dx, dy, style, a, lw) => { c.save(); c.translate(dx, dy); c.globalAlpha = a; c.strokeStyle = style; c.lineWidth = lw; smoothPath(c, p); c.stroke(); c.restore(); };
+  pass(0, 0, '#5c4a2c', 0.55, w * 2.6);                   // aufgeworfenes Wachs neben der Rille
+  pass(w * 0.25, w * 0.25, '#7a6440', 0.35, w * 1.9);      // Licht auf dem Wulst
+  pass(-w * 0.18, -w * 0.18, '#070402', 0.9, w * 1.15);    // Schattenkante der Rille
+  pass(0, 0, chalkPattern(c, o.c, 0.94), 1, w * 0.8);      // Rillengrund: leicht raues, helleres Wachs
+  pass(w * 0.15, w * 0.15, '#f1dcaa', 0.3, Math.max(0.5, w * 0.22));
+}
 function nibStroke(c, o, nibDeg, k0, k1, alpha) {        // Breitfeder/Pinsel: Strichstärke hängt von der Richtung ab
   const p = o.pts, nib = rad(nibDeg); let prev = o.w * 0.5; c.globalAlpha = alpha; c.strokeStyle = o.c; c.lineCap = 'round';
   for (let i = 1; i < p.length; i++) {
@@ -261,7 +273,7 @@ function drawHistPen(c, o) {
     case 'slate': c.globalAlpha = 0.9; c.strokeStyle = chalkPattern(c, o.c, 0.7); c.lineWidth = o.w; smoothPath(c, p); c.stroke(); break;
     case 'reed': nibStroke(c, o, 10, 0.55, 0.45, 0.9); break;
     case 'quill': nibStroke(c, o, -40, 0.22, 0.95, 0.94); break;
-    case 'stylus': groove(c, o, '#0e0904', o.c, '#f3e2b6'); break;
+    case 'stylus': waxGroove(c, o); break;
     case 'stick': groove(c, o, '#7c5c2e', '#bd9a62', '#f7e9c8'); break;
     case 'stickclay': groove(c, o, '#4a2810', o.c, '#e3b98c'); break;
     case 'lead': c.globalAlpha = 0.5; c.strokeStyle = o.c; c.lineWidth = o.w; smoothPath(c, p); c.stroke(); break;
@@ -291,8 +303,8 @@ function histPenSVG(p) {
     sponge: `<rect x="5" y="22" width="32" height="36" rx="7" fill="#f2d36b" stroke="#a8861f"/><rect x="5" y="16" width="32" height="10" rx="4" fill="#3f8f4a"/><circle cx="14" cy="36" r="2" fill="#c9a43a"/><circle cx="26" cy="44" r="2.5" fill="#c9a43a"/><circle cx="20" cy="51" r="1.8" fill="#c9a43a"/>`,
     reed: `<path d="M19 2h4l1 46-3 10-3-10z" fill="#cdae6c" stroke="#8a6a35"/><path d="M19 52l2 6 2-6z" fill="${ink}"/>`,
     quill: `<path d="M31 2C13 9 11 31 19.5 48h3C25 32 33 15 31 2z" fill="#f6f2ea" stroke="#9a978f"/><path d="M27 6C20 18 20 34 21 48" stroke="#b9b5aa" fill="none"/><path d="M19.5 48h3l-1.5 12z" fill="${ink}"/>`,
-    stylus: `<path d="M19 12h4v38l-2 9-2-9z" fill="#b48f55" stroke="#6e5530"/><path d="M14 3h14l-5 10h-4z" fill="#b48f55" stroke="#6e5530"/>`,
-    spatula: `<g transform="rotate(180 21 34)"><path d="M19 12h4v38l-2 9-2-9z" fill="#b48f55" stroke="#6e5530"/><path d="M14 3h14l-5 10h-4z" fill="#b48f55" stroke="#6e5530"/></g>`,
+    stylus: `<path d="M18.5 6h5v4h-5z" fill="#8c6c3e" stroke="#5a4426"/><path d="M19.5 10h3v30l-1.5 14-1.5-14z" fill="#d7b06b" stroke="#6e5530"/><path d="M21 46v8" stroke="#fff3c8" stroke-width="1.2"/>`,
+    spatula: `<path d="M20 6l1-6 1 6z" fill="#8c6c3e" stroke="#5a4426"/><path d="M19.5 6h3v30h-3z" fill="#b48f55" stroke="#6e5530"/><path d="M19 36h4l6 16H13z" fill="#d7b06b" stroke="#6e5530"/><path d="M14 51h14" stroke="#fff3c8" stroke-width="1.2"/>`,
     stick: `<path d="M18 2h6l-1 52-2 6-2-6z" fill="#9b7442" stroke="#5e4320"/><path d="M19 12h4M19 30h4" stroke="#6e5230"/>`,
     stickclay: `<path d="M18 2h6l-1 52-2 6-2-6z" fill="#cdae6c" stroke="#8a6a35"/>`,
     wedge: `<path d="M16 2h10v44l-5 12-5-12z" fill="#cdae6c" stroke="#8a6a35"/><path d="M16 46l5 12 5-12z" fill="#8a6a35"/>`,
@@ -377,3 +389,15 @@ function drawPointerStick(c, z) {                         // Zeigestock statt La
   c.strokeStyle = g; c.lineWidth = 7 / z; c.beginPath(); c.moveTo(x, y); c.lineTo(ex, ey); c.stroke();
   c.restore();
 }
+
+/* ---------- Nur auf der Tafel schreiben (Wachstafel, Tontafel, Schiefertafel) ---------- */
+function tplAreas() {                                      // beschreibbare Flächen in Board-Koordinaten
+  const t = curTpl(); if (!t || !t.objects) return null;
+  if (t.objects === 'wax') return OBJ_RECTS.wax().map(r => ({ r, rad: 0 }));
+  if (t.objects === 'clay') return [{ r: OBJ_RECTS.clay()[0], rad: 110 }];
+  if (t.objects === 'slate') return [{ r: OBJ_RECTS.slate()[0], rad: 0 }];
+  return null;
+}
+function clipToAreas(c) { const A = tplAreas(); if (!A) return false; c.beginPath(); for (const a of A) { const [x0, y0, x1, y1] = a.r; a.rad ? rrectPath(c, x0, y0, x1 - x0, y1 - y0, a.rad) : c.rect(x0, y0, x1 - x0, y1 - y0); } c.clip(); return true; }
+function rrectPath(c, x, y, w, hh, r) { c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + hh, r); c.arcTo(x + w, y + hh, x, y + hh, r); c.arcTo(x, y + hh, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function inAreas(p) { const A = tplAreas(); return !A || A.some(a => p.x >= a.r[0] && p.x <= a.r[2] && p.y >= a.r[1] && p.y <= a.r[3]); }

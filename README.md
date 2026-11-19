@@ -10,9 +10,10 @@ Läuft **im Browser** (Firefox, Edge, Chrome), ohne Installation und nach dem er
 - **Formerkennung**: Stift kurz stillhalten → saubere Linie, Kreis, Rechteck, Dreieck
 - **Formeln in LaTeX** zwischen `$…$` in Text, Notizen und Bauteil-Beschriftungen (MathJax, offline eingebaut)
 - Zeichengeräte in Originalgröße: **Lineal**, **Geodreieck**, **Zirkel**, **Parabel**
+- **Schaltungssimulation** wie bei Falstad: Strom als wandernde Punkte, Spannung als Farbe, Messgeräte mit Oszilloskop, Schalter zum Anklicken
 - **Elektronik-Baukasten**: über 70 Schaltsymbole, 26 fertige Schaltungen (am Mauszeiger platzieren und drehen), **Leitungen ziehen** mit automatischen Knotenpunkten
 - **Präsentieren**: Präsentationsfenster für Beamer (live), Laserpointer, Leisten ausblenden (Tab), Vollbild (F)
-- Optional (Einstellungen): Funktionsplotter, Zeigerdiagramm, Diagramm-Vorlagen (Bode, Oszilloskop …), Stoppuhr
+- Diagramme als feste Objekte (verschieben/skalieren, Doppelklick bearbeitet); optional (Einstellungen): Funktionsplotter, Zeigerdiagramm, Diagramm-Vorlagen (Bode, Oszilloskop …), Stoppuhr
 - **Historische Tafeln** (in den Einstellungen einschalten): Kreidetafel, Papyrusrolle, römische Wachstafel, Archimedes’ Sandtafel, mesopotamische Tontafel, Schiefertafel, Pergament mit Gänsekiel – jeweils mit eigenen Schreibgeräten
 - **Automatisches Speichern** im Browser (IndexedDB); zusätzlich mit **Strg+S** als `.owb`-Datei sichern
 - Hilfslinien als Punkte, Karos oder Schreibheft-Linien, Stärke einstellbar

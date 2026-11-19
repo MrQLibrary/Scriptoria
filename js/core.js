@@ -3,7 +3,7 @@
 const $ = (s, r = document) => r.querySelector(s);
 const FONT = '"Segoe UI",system-ui,sans-serif';
 const GRID = 10;                       // Rastergröße in Board-Einheiten
-const BOX = new Set(['rect', 'ellipse', 'note', 'text', 'image', 'symbol']);
+const BOX = new Set(['rect', 'ellipse', 'note', 'text', 'image', 'symbol', 'graph']);
 const isBox = o => o && BOX.has(o.type);
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -73,18 +73,18 @@ function record(pre) {
   if (snapshot() !== pre) {
     S.hist.push(pre); S.histSize = (S.histSize || 0) + pre.length;
     while (S.hist.length > 80 || (S.histSize > 60e6 && S.hist.length > 5)) S.histSize -= S.hist.shift().length;   // Speicher begrenzen
-    S.fut = []; markDirty(); if (window.presentDirty) presentDirty();
+    S.fut = []; markDirty(); if (window.presentDirty) presentDirty(); if (window.simDirty) simDirty();
   }
   if (window.syncHist) syncHist();
   if (window.render) render();
 }
 function undo() {
   if (!S.hist.length) return;
-  S.fut.push(snapshot()); const h0 = S.hist.pop(); S.histSize = Math.max(0, (S.histSize || 0) - h0.length); S.objs = JSON.parse(h0); S.sels = []; markDirty(); if (window.presentDirty) presentDirty(); render(); if (window.refreshUI) refreshUI();
+  S.fut.push(snapshot()); const h0 = S.hist.pop(); S.histSize = Math.max(0, (S.histSize || 0) - h0.length); S.objs = JSON.parse(h0); S.sels = []; markDirty(); if (window.presentDirty) presentDirty(); if (window.simDirty) simDirty(); render(); if (window.refreshUI) refreshUI();
 }
 function redo() {
   if (!S.fut.length) return;
-  const cur = snapshot(); S.hist.push(cur); S.histSize = (S.histSize || 0) + cur.length; S.objs = JSON.parse(S.fut.pop()); S.sels = []; markDirty(); if (window.presentDirty) presentDirty(); render(); if (window.refreshUI) refreshUI();
+  const cur = snapshot(); S.hist.push(cur); S.histSize = (S.histSize || 0) + cur.length; S.objs = JSON.parse(S.fut.pop()); S.sels = []; markDirty(); if (window.presentDirty) presentDirty(); if (window.simDirty) simDirty(); render(); if (window.refreshUI) refreshUI();
 }
 function markDirty() { S.dirty = true; if (window.scheduleSave) scheduleSave(); }
 
@@ -143,11 +143,26 @@ function toWorld(e) { const r = $('#board').getBoundingClientRect(); return { x:
 function toScreen(x, y) { return [x * S.view.z + S.view.x, y * S.view.z + S.view.y]; }
 
 /* ---------- Bilder ---------- */
-const imgCache = new Map();
+/* Speicherschonend: nur die zuletzt gebrauchten Bilder in voller Auflösung (LRU), dazu von jedem Bild eine kleine
+   Vorschau, die beim Herauszoomen genügt. So bleiben auch PDFs mit vielen Seiten flüssig und stabil. */
+const imgCache = new Map(), imgSmall = new Map(), MAX_FULL = 12, SMALL_W = 420;
 function getImg(id) {
   let im = imgCache.get(id);
-  if (!im) { im = new Image(); im.onload = () => { im._ok = true; render(); }; im.src = S.imgs[id] || ''; imgCache.set(id, im); }
+  if (im) { imgCache.delete(id); imgCache.set(id, im); return im; }        // als zuletzt benutzt markieren
+  im = new Image(); im.decoding = 'async';
+  im.onload = () => {
+    im._ok = true;
+    if (!imgSmall.has(id)) { try { const k = Math.min(1, SMALL_W / im.naturalWidth), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(im.naturalWidth * k)); c.height = Math.max(1, Math.round(im.naturalHeight * k)); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); imgSmall.set(id, c); } catch (e) { } }
+    if (im._res) im._res(); render();
+  };
+  im.onerror = () => { if (im._res) im._res(); };
+  im.src = S.imgs[id] || ''; imgCache.set(id, im);
+  while (imgCache.size > MAX_FULL) { const [k, old] = imgCache.entries().next().value; imgCache.delete(k); old.onload = null; old.src = ''; if (old._res) old._res(); }   // ältestes freigeben
   return im;
+}
+function clearImgCache() { for (const im of imgCache.values()) { im.onload = null; im.src = ''; } imgCache.clear(); imgSmall.clear(); }
+function loadImgsOf(list) {                                // für Export: alle Bilder einer Seite vollständig laden
+  return Promise.all(list.filter(o => o.type === 'image').map(o => { const im = getImg(o.id); return im._ok ? null : new Promise(r => { im._res = r; setTimeout(r, 8000); }); }));
 }
 function usedImgs() { const r = {}; for (const o of (window.allObjs ? allObjs() : S.objs)) if (o.type === 'image' && S.imgs[o.id]) r[o.id] = S.imgs[o.id]; return r; }
 

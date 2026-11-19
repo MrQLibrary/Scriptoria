@@ -15,7 +15,7 @@ const IC = {
   panels: 'M3 4h18v16H3z M8 4v16 M16 4v16', panelsoff: 'M3 4h18v16H3z M3 3l18 18',
   info: 'M12 8h.01 M11 12h1v5h1 M12 3a9 9 0 100 18 9 9 0 000-18z', chev: 'M9 6l6 6-6 6',
   geo: 'M3 18h18L12 9z M12 18v-3', parab: 'M4 4c3 14 13 14 16 0 M3 18h18', wire: 'M3 17h6V7h6v10h6 M3 17h.01 M21 17h.01',
-  latex: 'M4 6h7 M7.5 6v12 M13 9l7 9 M20 9l-7 9', present: 'M3 4h18v12H3z M8 20h8 M12 16v4', plot: 'M4 20V4 M4 20h16 M6 16c3-9 6-9 8-4s4 4 6-6', phasor: 'M4 19h16 M4 19L17 7 M17 7l-5 1 M17 7l-1 5 M4 19l9-1', diagram: 'M3 4h18v16H3z M3 9h18 M3 14h18 M9 4v16 M15 4v16', timer: 'M12 8v5l3 2 M10 2h4 M12 4a9 9 0 100 18 9 9 0 000-18z', scroll: 'M6 4h11a3 3 0 013 3v1h-4 M6 4a3 3 0 00-3 3v1h3 M6 4v13a3 3 0 003 3h9a3 3 0 003-3v-1H9v1a3 3 0 01-3 3', save: 'M5 3h12l4 4v14H5z M8 3v6h8V3 M8 21v-7h8v7', fit: 'M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5'
+  latex: 'M4 6h7 M7.5 6v12 M13 9l7 9 M20 9l-7 9', play: 'M7 4l13 8-13 8z', present: 'M3 4h18v12H3z M8 20h8 M12 16v4', plot: 'M4 20V4 M4 20h16 M6 16c3-9 6-9 8-4s4 4 6-6', phasor: 'M4 19h16 M4 19L17 7 M17 7l-5 1 M17 7l-1 5 M4 19l9-1', diagram: 'M3 4h18v16H3z M3 9h18 M3 14h18 M9 4v16 M15 4v16', timer: 'M12 8v5l3 2 M10 2h4 M12 4a9 9 0 100 18 9 9 0 000-18z', scroll: 'M6 4h11a3 3 0 013 3v1h-4 M6 4a3 3 0 00-3 3v1h3 M6 4v13a3 3 0 003 3h9a3 3 0 003-3v-1H9v1a3 3 0 01-3 3', save: 'M5 3h12l4 4v14H5z M8 3v6h8V3 M8 21v-7h8v7', fit: 'M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5'
 };
 const ico = n => `<svg viewBox="0 0 24 24">${IC[n].split(' M').map((d, i) => `<path d="${i ? 'M' : ''}${d}"/>`).join('')}</svg>`;
 const tbBtn = (icon, title, on, fn, extra) => h('button', { class: 'tb' + (on ? ' on' : ''), title, html: ico(icon) + (extra || ''), onclick: fn });
@@ -27,7 +27,7 @@ const TOOLS = [
   ['text', 'text', 'Text (T)'], ['note', 'note', 'Haftnotiz (N)'], ['img', 'image', 'Bild oder PDF einfügen'], '-',
   ['compass', 'compass', 'Zirkel (C)'], ['ruler', 'ruler', 'Lineal 1:1 (U)'], ['geo', 'geo', 'Geodreieck (G)'], ['parab', 'parab', 'Parabel (K)'], ['laser', 'laser', 'Laserpointer (J)'], '-',
   ['plot', 'plot', 'Funktionsplotter & Koordinatensystem'], ['phasor', 'phasor', 'Zeigerdiagramm'], ['diagram', 'diagram', 'Diagramm-Vorlagen'], ['timer', 'timer', 'Stoppuhr'], '-',
-  ['elec', 'chip', 'Elektronik-Baukasten (B)'], ['wire', 'wire', 'Leitung ziehen (W)']
+  ['elec', 'chip', 'Elektronik-Baukasten (B)'], ['wire', 'wire', 'Leitung ziehen (W)'], ['sim', 'play', 'Schaltung simulieren']
 ];
 const PALETTE = (() => {
   const hues = [['991b1b', 'dc2626', 'f87171', 'fca5a5', 'fecaca'], ['9a3412', 'ea580c', 'fb923c', 'fdba74', 'fed7aa'], ['a16207', 'eab308', 'facc15', 'fde047', 'fef08a'], ['166534', '16a34a', '4ade80', '86efac', 'bbf7d0'],
@@ -162,6 +162,7 @@ function buildProps() {
       kids.push(h('h3', {}, 'Drehung'), h('div', { class: 'row' }, r, '°', h('button', { class: 'btn sm', onclick: () => { applyProp('rot', 0); refreshUI(); } }, 'Zurücksetzen')));
     }
     if (S.sels.length === 1 && o.type === 'symbol') {
+      if (SIMDEF[o.sym] && SIMDEF[o.sym][1]) kids.push(h('h3', {}, 'Wert (Simulation)'), h('div', { class: 'row' }, h('input', { type: 'text', value: o.val || '', placeholder: simDefault(o), style: 'width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 6px', onchange: e => applyProp('val', e.target.value) })));
       kids.push(h('h3', {}, 'Beschriftung'), h('div', { class: 'row' }, h('input', { type: 'text', value: o.label || '', placeholder: 'z. B. R₁', style: 'width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 6px', onchange: e => applyProp('label', e.target.value) })));
       kids.push(...secColor('Farbe'), ...secWidth('Strichstärke'));
     }
@@ -169,6 +170,8 @@ function buildProps() {
       h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: duplicateSel }, 'Duplizieren'), h('button', { class: 'btn sm danger', onclick: deleteSel }, 'Löschen')));
     if (S.settings.electronics) kids.push(h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: saveSelectionAsCircuit }, 'Als Schaltung speichern …')));
   }
+  if (t === 'select' && S.sels.length === 1 && S.sels[0].type === 'graph' && ['plot', 'phasor'].includes(S.sels[0].spec.kind))
+    kids.push(h('button', { class: 'btn sm', style: 'margin-top:8px', onclick: () => editGraph(S.sels[0]) }, 'Diagramm bearbeiten …'));
   if (t === 'select' && S.sels.length && S.sels.every(x => x.type === 'image')) {
     const cb = h('input', { type: 'checkbox', checked: S.sels.every(x => x.lock), onchange: e => { const pre = snapshot(); S.sels.forEach(x => { x.lock = e.target.checked; }); record(pre); refreshUI(); } });
     kids.push(h('label', { class: 'chk', style: 'margin-top:8px' }, cb, ' Fixiert'), hint('Fixierte Bilder und PDF-Seiten lassen sich nicht versehentlich verschieben. Doppelklick wählt sie aus.'));
@@ -204,11 +207,11 @@ function refreshUI() {
     if (tc && t !== '-' && !['pen', 'eraser', 'hand'].includes(t[0]) && !(S.tool === t[0] && t[0] !== 'select')) continue;   // minimiert: nur Stift, Radierer, Hand (+ aktives Werkzeug)
     if (t === '-') { if (!lastSep) tools.append(h('div', { class: 'hsep' })); lastSep = true; continue; }
     const [id, icon, tip0] = t, tip = toolTip(id, tip0);
-    if ((id === 'elec' || id === 'wire') && !S.settings.electronics) continue;
+    if ((id === 'elec' || id === 'wire' || id === 'sim') && !S.settings.electronics) continue;
     if (!toolAllowed(id === 'img' ? 'image' : id) || S.settings.tools[id] === false) continue;
     lastSep = false;
-    const on = id === 'timer' ? !!S.timerOpen : id === 'ruler' ? S.ruler.on : id === 'geo' ? S.geo.on : id === 'elec' ? S.elecOpen : id === 'img' ? false : (S.tool === id || (id === 'select' && S.tool === 'place' && false));
-    tools.append(tbBtn(icon, tip, on, ev => { if (id === 'img') $('#f-img').click(); else if (id === 'ruler') toggleRuler(); else if (id === 'geo') toggleGeo(); else if (id === 'elec') toggleElec(); else if (id === 'plot') openPlotDialog(); else if (id === 'phasor') openPhasorDialog(); else if (id === 'diagram') diagramMenu(ev.currentTarget); else if (id === 'timer') toggleTimer(); else setTool(id); }));
+    const on = id === 'sim' ? SIM.on : id === 'timer' ? !!S.timerOpen : id === 'ruler' ? S.ruler.on : id === 'geo' ? S.geo.on : id === 'elec' ? S.elecOpen : id === 'img' ? false : (S.tool === id || (id === 'select' && S.tool === 'place' && false));
+    tools.append(tbBtn(icon, tip, on, ev => { if (id === 'img') $('#f-img').click(); else if (id === 'ruler') toggleRuler(); else if (id === 'geo') toggleGeo(); else if (id === 'elec') toggleElec(); else if (id === 'plot') openPlotDialog(); else if (id === 'phasor') openPhasorDialog(); else if (id === 'diagram') diagramMenu(ev.currentTarget); else if (id === 'timer') toggleTimer(); else if (id === 'sim') { SIM.on ? stopSim() : startSim(); } else if (S.tool === id && ['compass', 'laser', 'parab', 'wire'].includes(id)) toggleOffTool(); else setTool(id); }));
   }
   while (tools.lastChild && tools.lastChild.classList.contains('hsep')) tools.lastChild.remove();
   // Stiftleiste
@@ -244,7 +247,7 @@ function toggleElec() { if (!S.settings.electronics) return; S.elecOpen = !S.ele
 let builtinCircuits = null; S.userCircuits = [];
 function buildElec() {
   const el = $('#elec'), tab = S.elecTab || 'parts';
-  const head = h('div', { class: 'eh' }, h('b', {}, 'Elektronik-Baukasten'), h('button', { class: 'btn sm', onclick: openElecHelp }, 'Anleitung'), h('button', { class: 'tb', title: 'Schließen', onclick: toggleElec }, '✕'));
+  const head = h('div', { class: 'eh' }, h('b', {}, 'Elektronik-Baukasten'), h('button', { class: 'btn sm primary', title: 'Gezeichnete Schaltung berechnen und animieren', onclick: () => { SIM.on ? stopSim() : startSim(); } }, SIM.on ? '■ Stopp' : '▶ Simulieren'), h('button', { class: 'btn sm', onclick: openElecHelp }, 'Anleitung'), h('button', { class: 'tb', title: 'Schließen', onclick: toggleElec }, '✕'));
   const tabs = h('div', { class: 'tabs' }, [['parts', 'Bauteile'], ['circuits', 'Schaltungen']].map(([v, l]) => h('button', { class: tab === v ? 'on' : '', onclick: () => { S.elecTab = v; buildElec(); } }, l)));
   const body = h('div', { class: 'eb' });
   const search = h('input', { class: 'search', type: 'search', placeholder: tab === 'parts' ? 'Bauteil suchen …' : 'Schaltung suchen …', value: S.elecQuery || '',

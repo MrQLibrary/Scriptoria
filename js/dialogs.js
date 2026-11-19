@@ -218,6 +218,7 @@ function openHelp() {
 <li><b>Fertige Schaltungen</b> (Reiter „Schaltungen“): Spannungsteiler, Filter, Schwingkreise, Operationsverstärker-Grundschaltungen, Gleichrichter, Transistorstufen, Messschaltungen u. v. m. Die Schaltung hängt nach dem Anklicken am Mauszeiger, ${k('Q')} dreht sie, ein Klick setzt sie ab.</li>
 <li><b>Leitung ziehen</b> ${k('W')}: Am Anschluss klicken, Eckpunkte setzen – die Leitung verläuft rechtwinklig und endet automatisch an einem Anschluss oder einer anderen Leitung. Knotenpunkte an Abzweigungen werden selbst gesetzt. Doppelklick, Rechtsklick oder ${k('Esc')} beendet.</li>
 <li>Beschriftungen von Bauteilen (rechts im Feld „Beschriftung“) dürfen Formeln enthalten, z. B. ${k('$R_1 = 10\\,\\mathrm{k\\Omega}$')}.</li>
+<li><b>Simulieren</b> (▶ in der Werkzeugleiste oder im Baukasten): Die gezeichnete Schaltung wird berechnet – wie beim Falstad-Simulator. Gelbe Punkte zeigen den Strom, die Farbe der Leitungen die Spannung (grün positiv, rot negativ). Amperemeter und Voltmeter zeigen ihren Wert und erscheinen im <b>Oszilloskop</b>. Ein Klick auf ein Bauteil nimmt seine Spannung ins Oszilloskop auf, ein Klick auf einen Schalter legt ihn um. Werte wie ${k('4,7 kΩ')}, ${k('100 µF')} oder ${k('10 V 50 Hz')} stehen rechts unter „Wert“. Simuliert werden Widerstände, Kondensatoren, Spulen, Quellen, Dioden, LEDs, Z-Dioden, Transistoren (NPN/PNP), Operationsverstärker, Logikgatter, Schalter, Lampen und Messgeräte. Änderungen an der Schaltung wirken sofort.</li>
 <li>Eigene Schaltungen speichern: alles markieren, „Als Schaltung speichern …“. Eigene Symbole lassen sich als JSON-Datei importieren – siehe „Anleitung“ im Baukasten.</li>
 </ul>
 
@@ -235,7 +236,7 @@ function openHelp() {
 <ul>
 <li><b>Kreidetafel:</b> Kreide in sechs Farben, Schwamm.</li>
 <li><b>Papyrusrolle</b> (Altes Ägypten): Binsenpinsel in Ruß-Schwarz und Ocker-Rot, feuchtes Tuch.</li>
-<li><b>Römische Wachstafel:</b> vier gebundene Holztafeln (umschalten rechts oder mit ${k('Bild ↑')}/${k('Bild ↓')}). Der Stilus ritzt mit der Spitze ins Wachs; ${k('D')} dreht ihn auf das flache Ende, das das Wachs wieder glättet – auch bei ausgeblendeten Leisten.</li>
+<li><b>Römische Wachstafel:</b> vier gebundene Holztafeln (umschalten rechts oder mit ${k('Bild ↑')}/${k('Bild ↓')}). Der Stilus ritzt mit der Spitze ins Wachs; ${k('D')} dreht ihn auf das flache Ende, das das Wachs wieder glättet – auch bei ausgeblendeten Leisten. Geschrieben wird nur auf dem Wachs, nicht auf dem Rahmen oder dem Tisch (ebenso bei Ton- und Schiefertafel).</li>
 <li><b>Archimedes’ Sandtafel:</b> mit dem Stab in den Sand zeichnen, mit der Hand glattstreichen.</li>
 <li><b>Mesopotamische Tontafel:</b> Das Schreibrohr drückt Keile ein (Ansatzpunkt = Kopf, Ziehen = Richtung und Länge), der Griffel ritzt Linien, der Daumen glättet.</li>
 <li><b>Schiefertafel:</b> mit Schreiblinien, Griffel, Kreide, Schwamm und Läppchen.</li>
@@ -259,7 +260,7 @@ function openHelp() {
 <li><b>Diagramm-Vorlagen:</b> Bode-Diagramm, Oszilloskop-Raster, Kennlinienfeld, logarithmisches Papier, Polarkoordinaten.</li>
 <li><b>Stoppuhr</b> mit Countdown (1–20 min) für Übungsaufgaben.</li>
 </ul>
-<p>Alles Eingefügte besteht aus normalen Linien und Texten und lässt sich verschieben, ändern und beschriften.</p>
+<p>Diagramme sind ein festes Objekt: verschieben, skalieren, löschen – aber nicht versehentlich zerlegen. Doppelklick (oder „Diagramm bearbeiten“) ändert Funktion und Bereich. Mit dem Stift kann man direkt hineinzeichnen, auch Freihand-Kurven in ein leeres Koordinatensystem (Diagramm-Vorlagen → „Leeres Koordinatensystem“); der Radierer lässt das Diagramm selbst unberührt.</p>
 
 <h3 id="hs11">Tastenkürzel</h3>
 <table class="keys">

@@ -123,11 +123,15 @@ function drawBox(c, o) {                              // Koordinaten: links oben
       strokeSetup(c, o, o.sw); c.stroke(); c.setLineDash([]); break;
     }
     case 'image': {
+      const t = c.getTransform(), scr = o.w * Math.hypot(t.a, t.b), sm = imgSmall.get(o.id);
+      if (sm && scr <= SMALL_W * 1.15) { c.drawImage(sm, 0, 0, o.w, o.h); break; }          // herausgezoomt: kleine Vorschau genügt
       const im = getImg(o.id);
       if (im._ok) { try { c.drawImage(im, 0, 0, o.w, o.h); } catch (e) {} }
-      else { c.fillStyle = '#8884'; c.fillRect(0, 0, o.w, o.h); }
+      else if (sm) c.drawImage(sm, 0, 0, o.w, o.h);
+      else { c.fillStyle = '#fff'; c.fillRect(0, 0, o.w, o.h); c.strokeStyle = '#8886'; c.lineWidth = 1; c.strokeRect(0, 0, o.w, o.h); }
       break;
     }
+    case 'graph': if (window.drawGraph) drawGraph(c, o); break;
     case 'note': {
       c.save(); c.shadowColor = 'rgba(0,0,0,.28)'; c.shadowBlur = 8; c.shadowOffsetY = 3; c.fillStyle = o.c; c.fillRect(0, 0, o.w, o.h); c.restore();
       if (o !== S.editing) {
@@ -178,10 +182,12 @@ function drawBase(c, d, v, opt) {
   c.setTransform(d * v.z, 0, 0, d * v.z, d * v.x, d * v.y);
   if (opt.grid) drawGuides(c, d, v, opt);
   const vr = opt.cull === false ? null : viewRect(v, opt.w, opt.h, d), m = 40 / v.z;
+  c.save(); if (window.clipToAreas) clipToAreas(c);          // historische Tafeln: nur auf der Schreibfläche
   for (const o of S.objs) {
     if (vr) { const b = objBounds(o); if (b[2] < vr[0] - m || b[0] > vr[2] + m || b[3] < vr[1] - m || b[1] > vr[3] + m) continue; }   // außerhalb des Bildschirms: überspringen
     drawObj(c, o);
   }
+  c.restore();
 }
 /* Hilfslinien: Punkte, Karos (5 mm) oder Linien wie im Schreibheft; Stärke in den Einstellungen */
 const GUIDE_W = { fein: { a: 0.75, lw: 0.7, r: 0.8 }, mittel: { a: 0.85, lw: 1, r: 1.1 }, kraeftig: { a: 1, lw: 1.6, r: 1.6 } };
@@ -205,7 +211,8 @@ function drawOverlay(c, d, v, w, hh) {
   c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, w, hh);
   RT.dark = themeDark();
   c.setTransform(d * v.z, 0, 0, d * v.z, d * v.x, d * v.y);
-  if (S.draft) drawObj(c, S.draft);
+  if (S.draft) { c.save(); if (S.draft.type === 'pen') clipToAreas(c); drawObj(c, S.draft); c.restore(); }
+  if (window.drawSim && SIM.on) drawSim(c, v.z);
   drawSelection(c, v.z);
   if (S.tool === 'compass') drawCompass(c);
   if (window.drawInstruments) drawInstruments(c, v.z);
@@ -242,6 +249,10 @@ function flushRender() {
   const zl = $('#zl'); if (zl) zl.textContent = Math.round(S.view.z * 100) + ' %';
   if (window.presentSend && !IS_PRESENTER_VIEW) presentSend();
 }
+for (const id of ['board', 'overlay']) document.addEventListener('DOMContentLoaded', () => {   // Browser hat Zeichenflächen wegen Speichermangel verworfen → neu aufbauen
+  const cv = $('#' + id); if (!cv) return;
+  cv.addEventListener('contextrestored', () => { if (window.resetTextures) resetTextures(); render(); });
+});
 function resizeBoard() {
   const d = window.devicePixelRatio || 1;
   for (const cv of [$('#board'), $('#overlay')]) { cv.width = Math.round(innerWidth * d); cv.height = Math.round(innerHeight * d); }
@@ -298,7 +309,7 @@ function drawLaser(c, z) {
   }
   if (L.active && L.pos) {
     const g = c.createRadialGradient(L.pos.x, L.pos.y, 0, L.pos.x, L.pos.y, 16 / z);
-    g.addColorStop(0, '#ffffff'); g.addColorStop(0.22, L.color); g.addColorStop(1, 'rgba(255,0,0,0)');
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.22, L.color); g.addColorStop(1, L.color + '00');   // Rand läuft in der Laserfarbe aus
     c.globalAlpha = 1; c.fillStyle = g; c.beginPath(); c.arc(L.pos.x, L.pos.y, 16 / z, 0, 7); c.fill();
   }
   c.restore();

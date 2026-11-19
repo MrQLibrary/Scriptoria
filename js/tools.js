@@ -3,7 +3,12 @@
 const TOOL_CURSOR = { select: 'default', hand: 'grab', pen: 'crosshair', eraser: 'none', line: 'crosshair', arrow: 'crosshair', rect: 'crosshair', ellipse: 'crosshair',
   note: 'copy', text: 'text', compass: 'crosshair', place: 'crosshair', laser: 'none', ruler: 'default', parab: 'crosshair', wire: 'crosshair' };
 
+function toggleOffTool() {                               // aktives Hilfswerkzeug erneut anklicken â†’ weg damit
+  if (S.tool === 'compass') S.compass.cx = null;
+  setTool(S.prevTool && S.prevTool !== S.tool ? S.prevTool : 'pen');
+}
 function setTool(t) {
+  if (t !== S.tool) S.prevTool = S.tool;
   if (S.editing) commitEdit();
   if (S.wire && t !== 'wire') wireFinish();
   S.eraserSkin = null;
@@ -99,6 +104,7 @@ function applyProp(key, val) {
     else if (key === 'noteH') { if (o.type === 'note') o.h = Math.max(60, val); }
     else if (key === 'rot') { if (isBox(o)) o.rot = rad(val); }
     else if (key === 'label') { if (o.type === 'symbol') o.label = val; }
+    else if (key === 'val') { if (o.type === 'symbol') o.val = val; }
   }
   record(pre);
 }
@@ -187,7 +193,7 @@ function penRuns(o, p, r) {                           // Stift-Strich in TeilstÃ
 function erase(p) {
   const r = S.eraser.size / S.view.z, out = []; let changed = false;
   for (const o of S.objs) {
-    if (o.type === 'image') { out.push(o); continue; }                     // Bilder/PDFs bleiben beim Radieren erhalten
+    if (o.type === 'image' || o.type === 'graph') { out.push(o); continue; }   // Bilder, PDFs und Diagramme bleiben beim Radieren erhalten
     if (S.eraser.mode === 'pixel' && o.type === 'pen') {
       const hitAny = o.pts.some(q => Math.hypot(q[0] - p.x, q[1] - p.y) <= r) || o.pts.some((q, i) => i && distSeg(p.x, p.y, o.pts[i - 1][0], o.pts[i - 1][1], q[0], q[1]) <= r);
       if (!hitAny) { out.push(o); continue; }

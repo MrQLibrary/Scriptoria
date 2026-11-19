@@ -75,6 +75,7 @@ function onDown(e) {
   S.hover = { sx, sy };
   if (e.button === 1 || S.tool === 'hand' || spaceDown) { drag = { k: 'pan', sx, sy, vx: S.view.x, vy: S.view.y }; cv.style.cursor = 'grabbing'; return; }
   if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (SIM.on && S.tool === 'select' && simClick(toWorld(e))) { renderOverlay(); return; }   // laufende Simulation: Schalter, Oszilloskop
   if (S.tool === 'wire' && e.button === 2) { wireFinish(); return; }
   if (S.geo.on && geoDown(sx, sy)) return;
   if (S.ruler.on && rulerDown(sx, sy)) return;
@@ -82,6 +83,7 @@ function onDown(e) {
   if (S.tool !== 'select' && S.sels.length) { S.sels = []; refreshUI(); }   // neues Zeichnen beendet die Auswahl
   switch (S.tool) {
     case 'pen': {
+      if (!inAreas(p)) return;                         // historische Tafel: neben der Tafel nicht schreiben
       let start = [p.x, p.y]; const snapR = instEdge(sx, sy);
       if (snapR) start = instSnapWorld(snapR, sx, sy);
       const pr = usePressure(e, pn);                       // Grafiktablett / Surface-Stift: Druckstärke mitschreiben
@@ -300,6 +302,7 @@ function onDbl(e) {
   const p = toWorld(e), t = hitTest(p);
   if (!t && (S.tool === 'select' || S.tool === 'hand')) { const l = hitTest(p, true); if (l && l.lock) { setTool('select'); S.sels = [l]; refreshUI(); render(); return; } }
   if (S.tool === 'select' && t && (t.type === 'text' || t.type === 'note')) startEdit(t, snapshot());
+  else if (t && t.type === 'graph' && (S.tool === 'select' || S.tool === 'hand')) editGraph(t);
 }
 function onWheel(e) {
   e.preventDefault();
@@ -310,6 +313,7 @@ function onWheel(e) {
 }
 
 /* ---------- Tastatur ---------- */
+const KEYTOGGLE = new Set(['compass', 'laser', 'parab']);
 const KEYTOOL = { v: 'select', h: 'hand', p: 'pen', e: 'eraser', l: 'line', a: 'arrow', r: 'rect', o: 'ellipse', n: 'note', t: 'text', c: 'compass', j: 'laser', k: 'parab' };
 function onKey(e) {
   if (S.screen !== 'editor') return;
@@ -352,7 +356,7 @@ function onKey(e) {
   if (k === 'g') { toggleGeo(); return; }
   if (k === 'w' && S.settings.electronics) { setTool('wire'); return; }
   if (k === 'b' && window.toggleElec) { toggleElec(); return; }
-  if (KEYTOOL[k]) { setTool(KEYTOOL[k]); e.preventDefault(); }
+  if (KEYTOOL[k]) { if (S.tool === KEYTOOL[k] && KEYTOGGLE.has(KEYTOOL[k])) toggleOffTool(); else setTool(KEYTOOL[k]); e.preventDefault(); }
 }
 function initInput() {
   const cv = $('#board');

@@ -216,7 +216,7 @@ function loadMathJax() {
   if (MJ.state !== 'idle') return; MJ.state = 'loading';
   window.MathJax = {
     loader: { load: [] }, tex: { packages: { '[+]': ['ams', 'newcommand', 'boldsymbol'] } }, svg: { fontCache: 'none' },
-    startup: { typeset: false, ready() { MathJax.startup.defaultReady(); MJ.state = 'ready'; MJ.cache.clear(); for (const o of S.objs) if (o.type === 'text') measureTextObj(o); render();
+    startup: { typeset: false, ready() { MathJax.startup.defaultReady(); MJ.state = 'ready'; MJ.cache.clear(); if (typeof GRAPH_CACHE !== 'undefined') GRAPH_CACHE.clear(); for (const o of S.objs) if (o.type === 'text') measureTextObj(o); render();
       setTimeout(() => { builtinCircuits = null; if (S.elecOpen && S.elecTab === 'circuits') buildElec(); }, 400); } }
   };
   const sc = document.createElement('script'); sc.src = 'lib/mathjax/tex-svg-full.js'; sc.async = true;
