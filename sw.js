@@ -1,5 +1,5 @@
 /* Service Worker: legt alle Dateien beim ersten Besuch im Cache, danach läuft Scriptoria auch ohne Internet. */
-const VERSION = 'scriptoria-v11';
+const VERSION = 'scriptoria-v12';
 const FILES = ['./', 'index.html', 'style.css', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'lib/pdf.min.js', 'lib/pdf.worker.min.js', 'lib/jspdf.umd.min.js',
   'js/webapi.js', 'js/core.js', 'js/symbols.js', 'js/draw.js', 'js/tools.js', 'js/input.js', 'js/extras.js', 'icons/app/scroll.svg', 'icons/app/board.svg', 'icons/app/circuit.svg', 'icons/app/chalk.svg', 'icons/app/papyrus.svg', 'icons/app/wax.svg', 'icons/app/sand.svg', 'icons/app/clay.svg', 'icons/app/slate.svg', 'icons/app/parchment.svg', 'js/historic.js', 'js/pages.js', 'js/smart.js', 'js/sim.js', 'lib/mathjax/tex-svg-full.js', 'js/templates.js', 'js/dialogs.js', 'js/ui.js', 'js/app.js', 'js/pwa.js'];

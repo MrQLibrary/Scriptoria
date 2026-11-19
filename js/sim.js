@@ -66,7 +66,18 @@ function buildNet() {
     if (d[0] === 'GND') { gndRoot = gndRoot || find(ks[0]); uni(ks[0], gndRoot); gndRoot = find(gndRoot); continue; }
     els.push({ o, type: d[0], keys: ks });
   }
-  if (!gndRoot) { const src = els.find(e => ['V', 'AC'].includes(e.type)) || els[0]; if (src) gndRoot = find(src.keys[src.keys.length > 1 ? 1 : 0]); }
+  if (!gndRoot) { const src = els.find(e => ['V', 'AC'].includes(e.type)); if (src) gndRoot = find(src.keys[src.keys.length > 1 ? 1 : 0]); }
+  // Logik: Anschlüsse, die nur Gatter-Eingänge speisen, werden zu umschaltbaren Eingängen (0 V / 5 V)
+  const gIn = new Set(), drv = new Set(), logicTerms = [];
+  for (const e of els) {
+    if (e.type === 'GATE') { const one = e.keys.length === 2; e.keys.forEach((k, i) => (i === (one ? 1 : 2) ? drv : gIn).add(find(k))); }
+    else if (['V', 'AC', 'VCC', 'OA', 'CMP'].includes(e.type)) e.keys.forEach(k => drv.add(find(k)));
+  }
+  for (const o of S.objs) if (o.type === 'symbol' && o.sym === 'terminal' && pinKeys.has(o)) {
+    const k = pinKeys.get(o)[0], r = find(k);
+    if (gIn.has(r) && !drv.has(r)) { els.push({ o, type: 'LIN', keys: [k] }); logicTerms.push({ o, k, isIn: true }); }
+    else if (drv.has(r) && [...els].some(e => e.type === 'GATE' && find(e.keys[e.keys.length === 2 ? 1 : 2]) === r)) logicTerms.push({ o, k, isIn: false });
+  }
   // Knotennummern: 0 = Masse
   const idx = new Map(); let n = 0;
   if (gndRoot) idx.set(find(gndRoot), 0);
@@ -75,7 +86,7 @@ function buildNet() {
   let m = 0;                                             // zusätzliche Unbekannte (Ströme in Spannungsquellen)
   for (const e of els) {
     e.n = e.keys.map(node); e.val = simValue(e.o);
-    if (['V', 'AC', 'AM', 'VCC', 'OA', 'CMP', 'GATE'].includes(e.type)) e.k = m++;
+    if (['V', 'AC', 'AM', 'VCC', 'OA', 'CMP', 'GATE', 'LIN'].includes(e.type)) e.k = m++;
     e.st = { v: 0, i: 0, vd: 0, vd2: 0, vbe: 0, vbc: 0, out: 0 };
   }
   // Leitungsabschnitte für die Strompunkte
@@ -85,7 +96,7 @@ function buildNet() {
     list.sort((a, b) => ((pts.get(a)[0] - w.x1) * dx + (pts.get(a)[1] - w.y1) * dy) / L2 - ((pts.get(b)[0] - w.x1) * dx + (pts.get(b)[1] - w.y1) * dy) / L2);
     for (let i = 1; i < list.length; i++) if (list[i] !== list[i - 1]) segs.push({ a: list[i - 1], b: list[i], node: node(list[i]), I: 0, w });
   }
-  return { els, n, m, node, pts, segs, unsupported: [...unsupported] };
+  return { els, n, m, node, pts, segs, logicTerms, unsupported: [...unsupported] };
 }
 
 /* ---------- Lineares Gleichungssystem (Gauß mit Spaltenpivotsuche) ---------- */
@@ -168,6 +179,7 @@ function simStep(net, dt, t) {
           else B[r] = Math.sign(want) * Vmax;
           break;
         }
+        case 'LIN': Vsrc(a, 0, e.k, e.o.logic ? 5 : 0); break;
         case 'CMP': { const pv = q => (q && net.xPrev ? net.xPrev[q - 1] : 0); Vsrc(c, 0, e.k, pv(a) > pv(b) ? 5 : 0); break; }
         case 'GATE': {
           const sym = e.o.sym, one = ['not', 'buffer', 'schmitt'].includes(sym), out = one ? b : c;
@@ -307,12 +319,12 @@ function drawSim(c, z) {
   // Leuchten, Schalterstellung, Messwerte
   for (const e of net.els) {
     const [cx, cy] = center(e.o);
-    if ((e.type === 'LED' || e.type === 'LAMP') && e.I > 1e-4) {
-      const k = clamp(e.type === 'LED' ? e.I / 0.02 : Math.abs(e.I) / 0.2, 0, 1.2), r = 18 + 30 * k, col = e.type === 'LED' ? colorOf(e.o.c === '@ink' ? '#ef4444' : e.o.c) : '#fde047';
+    if ((e.type === 'LED' && e.I > 1e-4) || (e.type === 'LAMP' && Math.abs(e.I) > 1e-3)) {
+      const k = clamp(e.type === 'LED' ? e.I / 0.02 : Math.sqrt(Math.abs(e.I) / 0.05), 0, 1.2), r = 18 + 30 * k, col = e.type === 'LED' ? colorOf(e.o.c === '@ink' ? '#ef4444' : e.o.c) : '#facc15';
+      if (e.type === 'LAMP') { c.globalAlpha = Math.min(0.85, 0.3 + 0.55 * k); c.fillStyle = '#fde047'; c.beginPath(); c.arc(cx, cy, 19 * Math.min(e.o.w, e.o.h) / 40, 0, 7); c.fill(); c.globalAlpha = 1; }   // Glaskolben leuchtet
       const g = c.createRadialGradient(cx, cy, 2, cx, cy, r); g.addColorStop(0, col); g.addColorStop(1, col + '00');
       c.globalAlpha = Math.min(0.9, 0.25 + 0.6 * k); c.fillStyle = g; c.beginPath(); c.arc(cx, cy, r, 0, 7); c.fill(); c.globalAlpha = 1;
     }
-    if (e.type === 'SW' && e.o.closed) { const [ax, ay] = fromLocal(e.o, (22 / 80 - 0.5) * e.o.w, 0), [bx, by] = fromLocal(e.o, (58 / 80 - 0.5) * e.o.w, 0); c.strokeStyle = '#16a34a'; c.lineWidth = 3; c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke(); }
     if (e.meas != null) {
       const t = fmtSI(e.meas, e.type === 'AM' ? 'A' : 'V'); c.font = `600 ${15}px ${FONT}`; const tw = c.measureText(t).width, y0 = objBounds(e.o)[3] + 8;
       c.fillStyle = themeDark() ? 'rgba(20,22,26,.9)' : 'rgba(255,255,255,.95)'; c.fillRect(cx - tw / 2 - 6, y0, tw + 12, 22);
@@ -320,14 +332,38 @@ function drawSim(c, z) {
       c.fillStyle = '#2563eb'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(t, cx, y0 + 11);
       c.fillStyle = '#facc15';
     }
+    if (e.type === 'GATE') {                              // Logikpegel an Ein- und Ausgängen
+      const one = e.keys.length === 2, sym = SYM[e.o.sym];
+      e.keys.forEach((k, i) => {
+        const isOut = i === (one ? 1 : 2), [px, py] = sym.pins[i], bit = isOut ? e.st.out : V(e.n[i]) > 2.5 ? 1 : 0;
+        const [bx, by] = fromLocal(e.o, (px / sym.w - 0.5) * e.o.w + (isOut ? -12 : 12), (py / sym.h - 0.5) * e.o.h - 11);
+        logicBadge(c, bx, by, bit, false);
+      });
+    }
+  }
+  for (const t of net.logicTerms || []) {                  // Anschlüsse: Eingänge zum Antippen, Ausgänge zur Anzeige
+    const [x0, y0] = pinWorld(t.o, 0), bit = t.isIn ? (t.o.logic ? 1 : 0) : V(net.node(t.k)) > 2.5 ? 1 : 0;
+    logicBadge(c, x0, y0 - 24, bit, true, t.isIn);
   }
   c.restore();
 }
+function logicBadge(c, x, y, bit, big, clickable) {
+  const w = big ? 22 : 15, hh = big ? 22 : 15;
+  c.save(); c.setLineDash([]);
+  c.fillStyle = bit ? '#16a34a' : (themeDark() ? '#374151' : '#e5e7eb');
+  c.beginPath(); c.roundRect ? c.roundRect(x - w / 2, y - hh / 2, w, hh, 4) : c.rect(x - w / 2, y - hh / 2, w, hh); c.fill();
+  if (clickable) { c.strokeStyle = bit ? '#14532d' : '#6b7280'; c.lineWidth = 1.5; c.stroke(); }
+  c.fillStyle = bit ? '#fff' : (themeDark() ? '#e5e7eb' : '#374151'); c.font = `700 ${big ? 15 : 11}px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(bit ? '1' : '0', x, y + 0.5); c.restore();
+}
 function simClick(p) {                                     // während der Simulation: Schalter umlegen, Bauteil ins Oszilloskop
+  const lt = SIM.net && (SIM.net.logicTerms || []).find(t => t.isIn && (Math.hypot(p.x - pinWorld(t.o, 0)[0], p.y - pinWorld(t.o, 0)[1] + 24) < 16 || Math.hypot(p.x - pinWorld(t.o, 0)[0], p.y - pinWorld(t.o, 0)[1]) < 12));
+  if (lt) { lt.o.logic = lt.o.logic ? 0 : 1; return true; }
   const o = hitTest(p); if (!o || o.type !== 'symbol') return false;
-  if (o.sym === 'switch' || o.sym === 'button') { o.closed = !o.closed; return true; }
-  if (o.sym === 'switch_spdt') { o.pos = o.pos ? 0 : 1; return true; }
-  if (o.sym === 'pot') { const [lx] = toLocal(o, p.x, p.y); o.wiper = clamp(lx / o.w + 0.5, 0.02, 0.98); return true; }
+  if (o.sym === 'switch') { o.closed = !o.closed; markDirty(); render(); return true; }
+  if (o.sym === 'button') { o.closed = true; SIM.pressed = o; markDirty(); render(); return true; }        // Taster: nur solange gedrückt
+  if (o.sym === 'switch_spdt') { o.pos = o.pos ? 0 : 1; markDirty(); render(); return true; }
+  if (o.sym === 'pot') { const [lx] = toLocal(o, p.x, p.y); o.wiper = clamp(lx / o.w + 0.5, 0.02, 0.98); markDirty(); render(); return true; }
   if (SIMDEF[o.sym] && SIMDEF[o.sym][0] !== 'GND') {
     const i = SIM.traces.findIndex(t => t.o === o);
     if (i >= 0) SIM.traces.splice(i, 1); else SIM.traces.push(newTrace(o, o.sym === 'ammeter' ? 'I' : 'U'));
@@ -387,7 +423,7 @@ function buildSimbar() {
     h('button', { class: 'btn sm' + (SIM.scopeOn ? ' on' : ''), onclick: () => { SIM.scopeOn = !SIM.scopeOn; buildSimbar(); } }, 'Oszilloskop'),
     h('span', { id: 'simt', class: 'simlbl' }),
     h('button', { class: 'btn sm danger', onclick: stopSim }, '■ Beenden'),
-    h('div', { id: 'simwarn' }, SIM.warn), hint('Schalter anklicken schaltet um · Bauteil anklicken zeigt es im Oszilloskop · Werte rechts unter „Wert“'));
+    h('div', { id: 'simwarn' }, SIM.warn), hint('Schalter anklicken schaltet um, Taster schließt nur solange gedrückt · Logik-Eingänge (0/1 an den Anschlüssen) anklicken · Bauteil anklicken zeigt es im Oszilloskop'));
   updateSimbar();
 }
 function updateSimbar() {

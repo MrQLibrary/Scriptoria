@@ -151,7 +151,7 @@ function drawBox(c, o) {                              // Koordinaten: links oben
     }
     case 'symbol': {
       const sym = SYM[o.sym]; if (!sym) { c.strokeStyle = '#d33'; c.strokeRect(0, 0, o.w, o.h); break; }
-      const sx = o.w / sym.w, sy = o.h / sym.h, P = symP2D(sym), col = colorOf(o.c);
+      const sx = o.w / sym.w, sy = o.h / sym.h, P = symP2D(symStateGeo(o, sym)), col = colorOf(o.c);
       c.save(); c.scale(sx, sy);
       c.strokeStyle = col; c.fillStyle = col; c.lineWidth = o.sw / Math.sqrt(sx * sy); c.lineCap = 'round'; c.lineJoin = 'round';
       P.s.forEach(p => c.stroke(p)); P.f.forEach(p => c.fill(p));

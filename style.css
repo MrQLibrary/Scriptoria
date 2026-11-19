@@ -154,7 +154,7 @@ body.nopanels #zoombar,body.nopanels #pagebar{opacity:.55;transition:opacity .15
 #zoombar span.vsep{min-width:0;width:1px}
 .tbl{font-size:13px;white-space:nowrap}
 #pens.hist{background:linear-gradient(#5b3d22,#3d2814);border-color:#2a1a0c}
-.help ul{padding-left:20px;margin:6px 0} .help li{margin:4px 0}
+.help ul,.help ol{padding-left:20px;margin:6px 0} .help li{margin:4px 0}
 .help .toc{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
 .help .toc a{font-size:12px;padding:3px 9px;border:1px solid var(--line);border-radius:12px;color:var(--accent);text-decoration:none;background:var(--panel2)}
 .help .keys{border-collapse:collapse;width:100%;font-size:13px} .help .keys td{padding:4px 6px;border-bottom:1px solid var(--line)}

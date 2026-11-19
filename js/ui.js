@@ -8,7 +8,7 @@ const IC = {
   compass: 'M12 3v4 M12 7L6 21 M12 7l6 14 M8 16h8', ruler: 'M3 15L15 3l6 6L9 21z M7 13l2 2 M10 10l2 2 M13 7l2 2',
   laser: 'M12 8a4 4 0 100 8 4 4 0 000-8z M12 2v3 M12 19v3 M2 12h3 M19 12h3', chip: 'M7 7h10v10H7z M10 3v4 M14 3v4 M10 17v4 M14 17v4 M3 10h4 M3 14h4 M17 10h4 M17 14h4',
   undo: 'M9 14L4 9l5-5 M4 9h10a6 6 0 010 12h-3', redo: 'M15 14l5-5-5-5 M20 9H10a6 6 0 000 12h3', home: 'M3 11l9-8 9 8 M5 10v10h5v-6h4v6h5V10',
-  grid: 'M4 4h16v16H4z M4 12h16 M12 4v16', snap: 'M5 5h4v4H5z M15 15h4v4h-4z M9 7h8v8', gear: 'M12 15a3 3 0 100-6 3 3 0 000 6z M19.4 13a7.500 7.500 0 000-2l2-1.500-2-3.400-2.300 1a7 7 0 00-1.700-1L15 3h-4l-.4 3.100a7 7 0 00-1.700 1l-2.300-1-2 3.400 2 1.500a7.500 7.500 0 000 2l-2 1.500 2 3.400 2.300-1a7 7 0 001.700 1L11 21h4l.4-3.100a7 7 0 001.700-1l2.300 1 2-3.400z',
+  grid: 'M4 4h16v16H4z M4 12h16 M12 4v16', snap: 'M5 5h4v4H5z M15 15h4v4h-4z M9 7h8v8', gear: 'M19.13 10.03 L21.86 10.31 L21.86 13.69 L19.13 13.97 L18.44 15.65 L20.17 17.77 L17.77 20.17 L15.65 18.44 L13.97 19.13 L13.69 21.86 L10.31 21.86 L10.03 19.13 L8.35 18.44 L6.23 20.17 L3.83 17.77 L5.56 15.65 L4.87 13.97 L2.14 13.69 L2.14 10.31 L4.87 10.03 L5.56 8.35 L3.83 6.23 L6.23 3.83 L8.35 5.56 L10.03 4.87 L10.31 2.14 L13.69 2.14 L13.97 4.87 L15.65 5.56 L17.77 3.83 L20.17 6.23 L18.44 8.35z M12 15a3 3 0 100-6 3 3 0 000 6z',
   moon: 'M20 14.500A8 8 0 019.500 4 8 8 0 1020 14.500z', sun: 'M12 8a4 4 0 100 8 4 4 0 000-8z M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1.500 1.500 M17.500 17.500L19 19 M5 19l1.500-1.500 M17.500 6.500L19 5',
   export: 'M12 3v12 M7 8l5-5 5 5 M4 15v5h16v-5',
   full: 'M4 9V4h5 M15 4h5v5 M20 15v5h-5 M9 20H4v-5', fullx: 'M9 4v5H4 M20 9h-5V4 M15 20v-5h5 M4 15h5v5',
@@ -170,7 +170,7 @@ function buildProps() {
       h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: duplicateSel }, 'Duplizieren'), h('button', { class: 'btn sm danger', onclick: deleteSel }, 'Löschen')));
     if (S.settings.electronics) kids.push(h('div', { class: 'row' }, h('button', { class: 'btn sm', onclick: saveSelectionAsCircuit }, 'Als Schaltung speichern …')));
   }
-  if (t === 'select' && S.sels.length === 1 && S.sels[0].type === 'graph' && ['plot', 'phasor'].includes(S.sels[0].spec.kind))
+  if (t === 'select' && S.sels.length === 1 && S.sels[0].type === 'graph' && (['plot', 'phasor'].includes(S.sels[0].spec.kind) || TPL_FIELDS[S.sels[0].spec.kind]))
     kids.push(h('button', { class: 'btn sm', style: 'margin-top:8px', onclick: () => editGraph(S.sels[0]) }, 'Diagramm bearbeiten …'));
   if (t === 'select' && S.sels.length && S.sels.every(x => x.type === 'image')) {
     const cb = h('input', { type: 'checkbox', checked: S.sels.every(x => x.lock), onchange: e => { const pre = snapshot(); S.sels.forEach(x => { x.lock = e.target.checked; }); record(pre); refreshUI(); } });

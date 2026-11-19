@@ -271,6 +271,7 @@ function resizeMove(e, p) {
 
 /* ---------- Zeiger los ---------- */
 function onUp(e) {
+  if (SIM.pressed) { SIM.pressed.closed = false; SIM.pressed = null; markDirty(); render(); renderOverlay(); }   // Taster loslassen
   touches.delete(e.pointerId); if (touches.size < 2) pinch = null;
   if (!drag) return;
   const d = drag; drag = null;

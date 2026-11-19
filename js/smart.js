@@ -198,8 +198,8 @@ function placeGroup(list, label) {                       // Gruppe in die Bildsc
 /* ======================================================================
    Funktionsplotter & Koordinatensystem
    ====================================================================== */
-async function openPlotDialog(edit) {
-  const P = edit ? { ...edit.spec } : (S.plotPrefs || (S.plotPrefs = { f: 'sin(x)', f2: '', x0: -6.3, x1: 6.3, y0: -1.5, y1: 1.5, cm: 1.5, grid: true, xl: 'x', yl: 'y' }));
+async function openPlotDialog(edit, preset) {
+  const P = edit ? { ...edit.spec } : preset ? { ...preset } : (S.plotPrefs || (S.plotPrefs = { f: 'sin(x)', f2: '', x0: -6.3, x1: 6.3, y0: -1.5, y1: 1.5, cm: 1.5, grid: true, xl: 'x', yl: 'y' }));
   delete P.kind;
   const inp = (v, w = '90px', type = 'text') => h('input', { type, value: v, style: `width:${w}` });
   const f = inp(P.f, '100%'), f2 = inp(P.f2, '100%'), x0 = inp(P.x0, '70px'), x1 = inp(P.x1, '70px'), y0 = inp(P.y0, '70px'), y1 = inp(P.y1, '70px'), cm = inp(P.cm, '70px'), xl = inp(P.xl, '60px'), yl = inp(P.yl, '60px');
@@ -210,7 +210,7 @@ async function openPlotDialog(edit) {
     h('div', { class: 'frow' }, h('label', {}, 'x von … bis'), x0, x1), h('div', { class: 'frow' }, h('label', {}, 'y von … bis'), y0, y1),
     h('div', { class: 'frow' }, h('label', {}, 'cm pro Einheit'), cm), h('div', { class: 'frow' }, h('label', {}, 'Achsen'), xl, yl),
     h('label', { class: 'chk' }, grid, ' Gitterlinien'), err];
-  const ok = await dialog({ title: edit ? 'Diagramm bearbeiten' : 'Funktionsplotter', body, buttons: [{ label: 'Abbrechen', value: null }, { label: edit ? 'Übernehmen' : 'Einfügen', primary: true, value: true }],
+  const ok = await dialog({ title: edit ? 'Diagramm bearbeiten' : preset ? 'Koordinatensystem' : 'Funktionsplotter', body, buttons: [{ label: 'Abbrechen', value: null }, { label: edit ? 'Übernehmen' : 'Einfügen', primary: true, value: true }],
     onOpen: (dlg, close) => { const old = dlg.querySelector('.btn.primary'), btn = old.cloneNode(true); old.replaceWith(btn); btn.onclick = () => { try { buildPlot(); close(true); } catch (x) { err.textContent = x.message; } }; } });
   function buildPlot() {
     const num = el => { const v = parseFloat(String(el.value).replace(',', '.')); if (!isFinite(v)) throw new Error('Bitte gültige Zahlen eingeben.'); return v; };
@@ -292,13 +292,16 @@ function graphPrims(spec) {
   const key = JSON.stringify(spec); let g = GRAPH_CACHE.get(key); if (g) return g;
   let prims;
   try {
-    prims = spec.kind === 'plot' ? plotPrims(spec) : spec.kind === 'phasor' ? phasorPrims(spec) : spec.kind === 'bode' ? bodeObjs() : spec.kind === 'scope' ? scopeObjs()
-      : spec.kind === 'kenn' ? axesObjs({ x0: 0, x1: 10, y0: 0, y1: 10, U: S.settings.pxPerCm, xl: 'U / V', yl: 'I / mA' }) : spec.kind === 'log' ? logPaper(4, 9, 'f / Hz', '') : spec.kind === 'polar' ? polarObjs() : [];
+    const L = { ...TPL_DEFAULTS[spec.kind], ...spec };
+    prims = spec.kind === 'plot' ? plotPrims(spec) : spec.kind === 'phasor' ? phasorPrims(spec) : spec.kind === 'bode' ? bodeObjs(L) : spec.kind === 'scope' ? scopeObjs(L)
+      : spec.kind === 'kenn' ? axesObjs({ x0: 0, x1: num0(L.x1, 10), y0: 0, y1: num0(L.y1, 10), U: S.settings.pxPerCm * 10 / Math.max(num0(L.x1, 10), num0(L.y1, 10)), xl: L.xl, yl: L.yl })
+      : spec.kind === 'log' ? logPaper(4, 9, L.xl, L.yl) : spec.kind === 'polar' ? polarObjs(L) : spec.kind === 'zeiger' ? zeigerObjs(L) : [];
   } catch (e) { console.error(e); prims = []; }
   const b = allBounds(prims) || [0, 0, 100, 100];
   g = { prims, b }; GRAPH_CACHE.set(key, g); if (GRAPH_CACHE.size > 60) GRAPH_CACHE.delete(GRAPH_CACHE.keys().next().value);
   return g;
 }
+const num0 = (v, d) => { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) && n > 0 ? n : d; };
 function drawGraph(c, o) {
   const { prims, b } = graphPrims(o.spec), bw = Math.max(1, b[2] - b[0]), bh = Math.max(1, b[3] - b[1]);
   c.save(); c.scale(o.w / bw, o.h / bh); c.translate(-b[0], -b[1]); for (const p of prims) drawObj(c, p); c.restore();
@@ -313,19 +316,51 @@ function replaceGraph(o, spec) {
   const pre = snapshot(), old = graphPrims(o.spec).b, k = o.w / Math.max(1, old[2] - old[0]), nb = graphPrims(spec).b;
   o.spec = spec; o.w = (nb[2] - nb[0]) * k; o.h = (nb[3] - nb[1]) * k; record(pre); refreshUI(); render();
 }
-function editGraph(o) { if (o.spec.kind === 'plot') openPlotDialog(o); else if (o.spec.kind === 'phasor') openPhasorDialog(o); }
+function editGraph(o) { if (o.spec.kind === 'plot') openPlotDialog(o); else if (o.spec.kind === 'phasor') openPhasorDialog(o); else if (TPL_FIELDS[o.spec.kind]) openTplDialog(o.spec.kind, o); }
 
 /* ======================================================================
-   Diagramm-Vorlagen: Bode-Diagramm, Oszilloskop-Raster, Kennlinienfeld, Polarkoordinaten
+   Diagramm-Vorlagen: Bode-Diagramm, Oszilloskop-Raster, Kennlinienfeld, Polarkoordinaten, Zeigerdiagramm
+   Achsenbeschriftungen sind frei wählbar (beim Einfügen und per Doppelklick); $…$ setzt Formeln.
    ====================================================================== */
+const TPL_DEFAULTS = {
+  bode: { xl: 'f / Hz', yl: '|H| in dB', yl2: 'φ in °' },
+  scope: { yl: 'Y: ____ V/Teil', xl: 'X: ____ ms/Teil' },
+  kenn: { xl: 'U / V', yl: 'I / mA', x1: 10, y1: 10 },
+  log: { xl: 'f / Hz', yl: '' },
+  polar: { r: '', grid: true },
+  zeiger: { xl: 'Re', yl: 'Im', grid: true, r: 4 }
+};
+const TPL_FIELDS = {
+  bode: { title: 'Bode-Diagramm', f: [['xl', 'Frequenzachse'], ['yl', 'Betrag (oben)'], ['yl2', 'Phase (unten)']] },
+  scope: { title: 'Oszilloskop-Raster', f: [['yl', 'Y-Ablenkung'], ['xl', 'Zeitbasis']] },
+  kenn: { title: 'Kennlinienfeld', f: [['xl', 'x-Achse'], ['yl', 'y-Achse'], ['x1', 'x bis'], ['y1', 'y bis']] },
+  log: { title: 'Logarithmisches Papier', f: [['xl', 'x-Achse'], ['yl', 'y-Achse']] },
+  polar: { title: 'Polarkoordinaten', f: [['r', 'Radius-Beschriftung']], c: [['grid', 'Winkelstrahlen alle 30°']] },
+  zeiger: { title: 'Zeigerdiagramm (leer)', f: [['xl', 'Waagerechte Achse'], ['yl', 'Senkrechte Achse'], ['r', 'Größe in cm']], c: [['grid', 'Hilfskreise und Winkelstrahlen']] }
+};
+async function openTplDialog(kind, edit) {
+  const D = TPL_FIELDS[kind], P = { ...TPL_DEFAULTS[kind], ...(edit ? edit.spec : (S.tplPrefs && S.tplPrefs[kind]) || {}) };
+  const ins = {}, chk = {};
+  const body = [
+    ...D.f.map(([k, l]) => h('div', { class: 'frow' }, h('label', {}, l), ins[k] = h('input', { type: 'text', value: P[k] ?? '', style: 'width:100%' }))),
+    ...(D.c || []).map(([k, l]) => h('label', { class: 'chk' }, chk[k] = h('input', { type: 'checkbox', checked: !!P[k] }), ' ' + l)),
+    hint('Formeln zwischen $…$, z. B. $U_C$ / V. Später per Doppelklick änderbar.')];
+  const ok = await dialog({ title: D.title, body, buttons: [{ label: 'Abbrechen', value: null }, { label: edit ? 'Übernehmen' : 'Einfügen', primary: true, value: true }] });
+  if (!ok) return;
+  const spec = { kind };
+  D.f.forEach(([k]) => spec[k] = ins[k].value); (D.c || []).forEach(([k]) => spec[k] = chk[k].checked);
+  (S.tplPrefs || (S.tplPrefs = {}))[kind] = { ...spec };
+  if (edit) replaceGraph(edit, spec); else placeGraph(spec, D.title);
+}
 function diagramMenu(anchor) {
   popupMenu(anchor, [
-    { label: 'Leeres Koordinatensystem', run: () => placeGraph({ kind: 'plot', f: '', f2: '', x0: -5, x1: 5, y0: -4, y1: 4, cm: 1, grid: true, xl: 'x', yl: 'y' }, 'Koordinatensystem') },
-    { label: 'Bode-Diagramm (Betrag und Phase)', run: () => placeGraph({ kind: 'bode' }, 'Bode-Diagramm') },
-    { label: 'Oszilloskop-Raster (10 × 8 Teile)', run: () => placeGraph({ kind: 'scope' }, 'Oszilloskop-Raster') },
-    { label: 'Kennlinienfeld I(U)', run: () => placeGraph({ kind: 'kenn' }, 'Kennlinienfeld') },
-    { label: 'Logarithmisches Papier (4 Dekaden)', run: () => placeGraph({ kind: 'log' }, 'Log-Papier') },
-    { label: 'Polarkoordinaten', run: () => placeGraph({ kind: 'polar' }, 'Polarkoordinaten') }]);
+    { label: 'Leeres Koordinatensystem', run: () => openPlotDialog(null, { f: '', f2: '', x0: -5, x1: 5, y0: -4, y1: 4, cm: 1, grid: true, xl: 'x', yl: 'y' }) },
+    { label: 'Zeigerdiagramm (leer, zum Hineinzeichnen)', run: () => openTplDialog('zeiger') },
+    { label: 'Bode-Diagramm (Betrag und Phase)', run: () => openTplDialog('bode') },
+    { label: 'Oszilloskop-Raster (10 × 8 Teile)', run: () => openTplDialog('scope') },
+    { label: 'Kennlinienfeld', run: () => openTplDialog('kenn') },
+    { label: 'Logarithmisches Papier (4 Dekaden)', run: () => openTplDialog('log') },
+    { label: 'Polarkoordinaten', run: () => openTplDialog('polar') }]);
 }
 function logPaper(dec, hCm, xl, yl, yTicks) {             // x logarithmisch, y linear
   const D = 3.2 * S.settings.pxPerCm, H = hCm * S.settings.pxPerCm, W = dec * D, out = [], gc = '#9aa3ad';
@@ -336,25 +371,38 @@ function logPaper(dec, hCm, xl, yl, yTicks) {             // x logarithmisch, y 
   out.push(G.text(W / 2, H + 40, xl, 15)); if (yl) out.push(G.text(-12, -18, yl, 15, '@ink', 'left'));
   return out;
 }
-function bodeObjs() {
-  const a = logPaper(5, 6, 'f / Hz', '|H| in dB', (j, n) => String(40 - j * 80 / n).replace('-', '−'));
-  const b = logPaper(5, 4.5, 'f / Hz', 'φ in °', (j, n) => String(90 - j * 180 / n).replace('-', '−'));
+function bodeObjs(L) {
+  const a = logPaper(5, 6, L.xl, L.yl, (j, n) => String(40 - j * 80 / n).replace('-', '−'));
+  const b = logPaper(5, 4.5, L.xl, L.yl2, (j, n) => String(90 - j * 180 / n).replace('-', '−'));
   const off = 6 * S.settings.pxPerCm + 90; b.forEach(o => moveObj(o, 0, off));
   return [...a, ...b];
 }
-function scopeObjs() {
+function scopeObjs(L) {
   const D = 1.0 * S.settings.pxPerCm, W = 10 * D, H = 8 * D, out = [], gc = '#9aa3ad';
   out.push({ type: 'rect', x: 0, y: 0, w: W, h: H, rot: 0, c: '@ink', sw: 2, ls: 'solid', fill: false });
   for (let i = 1; i < 10; i++) out.push(G.line(i * D, 0, i * D, H, i === 5 ? 1.2 : 0.7, i === 5 ? '#6b7280' : gc, i === 5 ? 'solid' : 'dotted'));
   for (let j = 1; j < 8; j++) out.push(G.line(0, j * D, W, j * D, j === 4 ? 1.2 : 0.7, j === 4 ? '#6b7280' : gc, j === 4 ? 'solid' : 'dotted'));
   for (let i = 1; i < 50; i++) if (i % 5) { out.push(G.line(i * D / 5, H / 2 - 4, i * D / 5, H / 2 + 4, 1, '#6b7280')); }
   for (let j = 1; j < 40; j++) if (j % 5) { out.push(G.line(W / 2 - 4, j * D / 5, W / 2 + 4, j * D / 5, 1, '#6b7280')); }
-  out.push(G.text(0, H + 18, 'Y: ____ V/Teil', 13, '@ink', 'left'), G.text(W, H + 18, 'X: ____ ms/Teil', 13, '@ink', 'right'));
+  if (L.yl) out.push(G.text(0, H + 18, L.yl, 13, '@ink', 'left')); if (L.xl) out.push(G.text(W, H + 18, L.xl, 13, '@ink', 'right'));
   return out;
 }
-function polarObjs() {
-  const R = 4 * S.settings.pxPerCm, out = [], gc = '#9aa3ad';
+function polarObjs(L = {}) {
+  const R = 4 * S.settings.pxPerCm, out = [], gc = '#9aa3ad', grid = L.grid !== false;
   for (let k = 1; k <= 4; k++) out.push({ type: 'arc', cx: 0, cy: 0, r: R * k / 4, a0: 0, sweep: Math.PI * 2, c: k === 4 ? '#6b7280' : gc, w: k === 4 ? 1.2 : 0.7, ls: 'solid' });
-  for (let d = 0; d < 360; d += 30) { const a = rad(d); out.push(G.line(0, 0, R * Math.cos(a), -R * Math.sin(a), d % 90 ? 0.7 : 1.2, d % 90 ? gc : '#6b7280')); out.push(G.text((R + 18) * Math.cos(a), -(R + 18) * Math.sin(a), d + '°', 12)); }
+  for (let d = 0; d < 360; d += grid ? 30 : 90) { const a = rad(d); out.push(G.line(0, 0, R * Math.cos(a), -R * Math.sin(a), d % 90 ? 0.7 : 1.2, d % 90 ? gc : '#6b7280')); out.push(G.text((R + 18) * Math.cos(a), -(R + 18) * Math.sin(a), d + '°', 12)); }
+  if (L.r) out.push(G.text(R / 2, 14, L.r, 13));
+  return out;
+}
+function zeigerObjs(L) {                                   // leeres Zeigerdiagramm: Re/Im-Achsen, auf Wunsch Hilfskreise und 30°-Strahlen
+  const R = num0(L.r, 4) * S.settings.pxPerCm, out = [], gc = '#aab3bd';
+  out.push({ type: 'rect', x: -R * 1.3, y: -R * 1.3, w: R * 2.6, h: R * 2.6, rot: 0, c: 'transparent', sw: 1, ls: 'solid', fill: false });   // fester Rahmen zum Hineinzeichnen
+  if (L.grid) {
+    for (let k = 1; k <= 4; k++) out.push({ type: 'arc', cx: 0, cy: 0, r: R * k / 4, a0: 0, sweep: Math.PI * 2, c: gc, w: 1, ls: k === 4 ? 'solid' : 'dashed' });
+    for (let d = 30; d < 360; d += 30) if (d % 90) { const a = rad(d); out.push(G.line(0, 0, R * Math.cos(a), -R * Math.sin(a), 0.9, gc, 'dashed')); out.push(G.text((R + 16) * Math.cos(a), -(R + 16) * Math.sin(a), d + '°', 11, '#9aa3ad')); }
+  }
+  out.push(G.arrow(-R * 1.15, 0, R * 1.2, 0, 1.6), G.arrow(0, R * 1.15, 0, -R * 1.2, 1.6));
+  if (L.xl) out.push(G.text(R * 1.2 + 6, 18, L.xl, 15, '@ink', 'left'));
+  if (L.yl) out.push(G.text(14, -R * 1.2 - 4, L.yl, 15, '@ink', 'left'));
   return out;
 }

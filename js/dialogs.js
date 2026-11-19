@@ -80,7 +80,7 @@ function openSettings() {
     h('input', { class: 'search', type: 'search', placeholder: 'Einstellung suchen …', oninput: e => filterSettings(e.target) }),
     h('h3', {}, 'Darstellung'), seg,
     h('div', { class: 'frow', style: 'display:block' }, h('label', {}, 'App-Symbol'), iconPicker(),
-      hint('Gilt sofort für Tab und Startbildschirm, für die installierte App beim nächsten Start.')),
+      hint('Gilt sofort für Tab und Startbildschirm. Für die installierte App muss Scriptoria aus Edge neu installiert werden (siehe ⓘ Hilfe → Ansicht).')),
     switchRow('Hilfetexte anzeigen', 'Kurze Hinweise in der rechten Leiste und in Meldungen.', S.settings.hints !== false, v => changeSetting('hints', v)),
     h('h3', {}, 'Hilfslinien'),
     switchRow('Hilfslinien anzeigen', null, S.settings.grid, v => changeSetting('grid', v)),
@@ -92,6 +92,7 @@ function openSettings() {
     switchRow('Druckempfindlicher Stift', 'Mit Grafiktablett oder Surface-Stift wird der Strich dicker, je fester man drückt.', S.settings.pressure !== false, v => changeSetting('pressure', v)),
     switchRow('Formen erkennen', 'Stift am Ende kurz stillhalten: Linie, Kreis, Ellipse, Rechteck oder Dreieck wird sauber gezogen.', S.settings.shapes !== false, v => changeSetting('shapes', v)),
     h('div', { class: 'frow' }, h('label', {}, 'PDF einfügen'), segSetting('pdfMode', [['Fragen', 'ask'], ['Untereinander', 'stack'], ['Je Seite', 'pages']])),
+    h('div', { class: 'frow' }, h('label', {}, 'PDF-Seiten nebeneinander'), segSetting('pdfCols', [['1', 1], ['2', 2], ['3', 3], ['4', 4]])),
     h('h3', {}, 'Werkzeuge in der Leiste'),
     tog('ruler', 'Lineal'), tog('geo', 'Geodreieck'), tog('compass', 'Zirkel'), tog('parab', 'Parabel'), tog('laser', 'Laserpointer'),
     tog('plot', 'Funktionsplotter & Koordinatensystem'), tog('phasor', 'Zeigerdiagramm'), tog('diagram', 'Diagramm-Vorlagen', 'Bode-Diagramm, Oszilloskop-Raster, Kennlinienfeld …'), tog('timer', 'Stoppuhr'),
@@ -180,7 +181,7 @@ function openHelp() {
 
 <h3 id="hs1">PDF & Seiten</h3>
 <ul>
-<li><b>PDF oder Bild einfügen:</b> Bild-Symbol links, Datei auf die Fläche ziehen oder ${k('Strg+V')}. Bei PDFs wählen Sie, ob die Seiten <b>untereinander</b> oder <b>jede als eigene Seite</b> eingefügt werden (Voreinstellung in den Einstellungen). Danach ist sofort der Stift aktiv.</li>
+<li><b>PDF oder Bild einfügen:</b> Bild-Symbol links, Datei auf die Fläche ziehen oder ${k('Strg+V')}. Bei PDFs wählen Sie, <b>welche Seiten</b> eingefügt werden (z. B. ${k('5-20')} oder ${k('1-3, 7, 10-12')}), ob sie <b>untereinander</b> oder <b>jede als eigene Seite</b> erscheinen und wie viele PDF-Seiten <b>nebeneinander</b> stehen (Voreinstellung in den Einstellungen). Danach ist sofort der Stift aktiv.</li>
 <li>PDF-Seiten sind <b>fixiert</b>: Beim Schreiben und Auswählen verrutschen sie nicht. Doppelklick (mit Auswahl- oder Hand-Werkzeug) wählt eine Seite trotzdem aus; rechts lässt sich „Fixiert“ ausschalten.</li>
 <li>Ein PDF auf den Startbildschirm ziehen legt direkt ein neues Whiteboard damit an.</li>
 <li><b>Seiten:</b> Unten rechts blättern (‹ ›, ${k('Bild ↑')}/${k('Bild ↓')}) oder mit ＋ eine neue Seite anlegen. Jede Seite ist eine eigene unendliche Fläche. Klick auf die Seitenzahl: verschieben oder löschen. Der PDF-Export kann alle Seiten auf einmal ausgeben.</li>
@@ -218,7 +219,7 @@ function openHelp() {
 <li><b>Fertige Schaltungen</b> (Reiter „Schaltungen“): Spannungsteiler, Filter, Schwingkreise, Operationsverstärker-Grundschaltungen, Gleichrichter, Transistorstufen, Messschaltungen u. v. m. Die Schaltung hängt nach dem Anklicken am Mauszeiger, ${k('Q')} dreht sie, ein Klick setzt sie ab.</li>
 <li><b>Leitung ziehen</b> ${k('W')}: Am Anschluss klicken, Eckpunkte setzen – die Leitung verläuft rechtwinklig und endet automatisch an einem Anschluss oder einer anderen Leitung. Knotenpunkte an Abzweigungen werden selbst gesetzt. Doppelklick, Rechtsklick oder ${k('Esc')} beendet.</li>
 <li>Beschriftungen von Bauteilen (rechts im Feld „Beschriftung“) dürfen Formeln enthalten, z. B. ${k('$R_1 = 10\\,\\mathrm{k\\Omega}$')}.</li>
-<li><b>Simulieren</b> (▶ in der Werkzeugleiste oder im Baukasten): Die gezeichnete Schaltung wird berechnet – wie beim Falstad-Simulator. Gelbe Punkte zeigen den Strom, die Farbe der Leitungen die Spannung (grün positiv, rot negativ). Amperemeter und Voltmeter zeigen ihren Wert und erscheinen im <b>Oszilloskop</b>. Ein Klick auf ein Bauteil nimmt seine Spannung ins Oszilloskop auf, ein Klick auf einen Schalter legt ihn um. Werte wie ${k('4,7 kΩ')}, ${k('100 µF')} oder ${k('10 V 50 Hz')} stehen rechts unter „Wert“. Simuliert werden Widerstände, Kondensatoren, Spulen, Quellen, Dioden, LEDs, Z-Dioden, Transistoren (NPN/PNP), Operationsverstärker, Logikgatter, Schalter, Lampen und Messgeräte. Änderungen an der Schaltung wirken sofort.</li>
+<li><b>Simulieren</b> (▶ in der Werkzeugleiste oder im Baukasten): Die gezeichnete Schaltung wird berechnet – wie beim Falstad-Simulator. Gelbe Punkte zeigen den Strom, die Farbe der Leitungen die Spannung (grün positiv, rot negativ). Amperemeter und Voltmeter zeigen ihren Wert und erscheinen im <b>Oszilloskop</b>. Ein Klick auf ein Bauteil nimmt seine Spannung ins Oszilloskop auf, ein Klick auf einen Schalter legt ihn um (auch in der Zeichnung), ein Taster schließt, solange er gedrückt wird, und am Potentiometer setzt der Klick den Schleifer. <b>Logikschaltungen:</b> An allen Gatter-Ein- und -Ausgängen steht der Pegel 0 oder 1 (grün = 1). Anschlüsse (○), die nur Gatter-Eingänge speisen, sind Eingänge: Antippen schaltet zwischen 0 und 1. Anschlüsse an Gatter-Ausgängen zeigen das Ergebnis. Werte wie ${k('4,7 kΩ')}, ${k('100 µF')} oder ${k('10 V 50 Hz')} stehen rechts unter „Wert“. Simuliert werden Widerstände, Kondensatoren, Spulen, Quellen, Dioden, LEDs, Z-Dioden, Transistoren (NPN/PNP), Operationsverstärker, Logikgatter, Schalter, Lampen und Messgeräte. Änderungen an der Schaltung wirken sofort.</li>
 <li>Eigene Schaltungen speichern: alles markieren, „Als Schaltung speichern …“. Eigene Symbole lassen sich als JSON-Datei importieren – siehe „Anleitung“ im Baukasten.</li>
 </ul>
 
@@ -251,6 +252,11 @@ function openHelp() {
 <li>Unten links: „Alles anzeigen“, Zoom, Klick auf die Prozentzahl setzt auf 100 % zurück.</li>
 <li>Oben: Hilfslinien ein/aus, Einrasten am Raster, heller/dunkler Modus. In den Einstellungen wählen Sie die Art der Hilfslinien (Punkte, Karos oder Linien wie im Schreibheft) und ihre Stärke.</li>
 <li>Ebenfalls in den Einstellungen: das <b>App-Symbol</b> – Whiteboard (Standard), Elektrotechnik, Schriftrolle oder passend zu jeder historischen Tafel.</li>
+<li><b>App-Symbol der installierten App wechseln:</b> Der Browser übernimmt das Symbol nur bei der Installation. Damit ein neues Symbol in Startmenü und Taskleiste erscheint, muss Scriptoria in Edge neu installiert werden:
+<ol><li>Installierte App deinstallieren: im App-Fenster oben rechts auf ${k('…')} → „Scriptoria deinstallieren“ (oder ${k('edge://apps')} öffnen, bei Scriptoria ${k('…')} → „Deinstallieren“). Haken bei „Daten löschen“ <b>nicht</b> setzen, sonst gehen die Boards verloren.</li>
+<li>Scriptoria in einem normalen Edge-Tab öffnen und in den Einstellungen das gewünschte App-Symbol wählen.</li>
+<li>In Edge ${k('…')} → „Apps“ → „Diese Website als App installieren“ wählen.</li></ol>
+In Tab und Browser-Leiste gilt das neue Symbol sofort.</li>
 </ul>
 
 <h3 id="hs10">Zusatzwerkzeuge</h3>
@@ -258,10 +264,10 @@ function openHelp() {
 <ul>
 <li><b>Funktionsplotter & Koordinatensystem:</b> z. B. ${k('2*sin(x - pi/4)')}, ${k('exp(-x)*cos(5x)')} oder ${k('x^2 - 1')}; Bereich, Maßstab und Achsenbeschriftung wählbar. Leer gelassen entsteht ein Koordinatensystem.</li>
 <li><b>Zeigerdiagramm:</b> Zeiger mit Betrag und Winkel (z. B. U und I) mit Re/Im-Achsen und Winkelbögen.</li>
-<li><b>Diagramm-Vorlagen:</b> Bode-Diagramm, Oszilloskop-Raster, Kennlinienfeld, logarithmisches Papier, Polarkoordinaten.</li>
+<li><b>Diagramm-Vorlagen:</b> leeres Koordinatensystem, leeres Zeigerdiagramm (Re/Im-Achsen mit Hilfskreisen zum Hineinzeichnen), Bode-Diagramm, Oszilloskop-Raster, Kennlinienfeld, logarithmisches Papier, Polarkoordinaten. Die <b>Achsenbeschriftungen</b> wählen Sie beim Einfügen frei, Formeln zwischen ${k('$…$')}.</li>
 <li><b>Stoppuhr</b> mit Countdown (1–20 min) für Übungsaufgaben.</li>
 </ul>
-<p>Diagramme sind ein festes Objekt: verschieben, skalieren, löschen – aber nicht versehentlich zerlegen. Doppelklick (oder „Diagramm bearbeiten“) ändert Funktion und Bereich. Mit dem Stift kann man direkt hineinzeichnen, auch Freihand-Kurven in ein leeres Koordinatensystem (Diagramm-Vorlagen → „Leeres Koordinatensystem“); der Radierer lässt das Diagramm selbst unberührt.</p>
+<p>Diagramme sind ein festes Objekt: verschieben, skalieren, löschen – aber nicht versehentlich zerlegen. Doppelklick (oder „Diagramm bearbeiten“) ändert Funktion, Bereich und Achsenbeschriftung. Mit dem Stift kann man direkt hineinzeichnen, auch Freihand-Kurven in ein leeres Koordinatensystem oder Zeiger in ein leeres Zeigerdiagramm (Diagramm-Vorlagen); der Radierer lässt das Diagramm selbst unberührt.</p>
 
 <h3 id="hs11">Tastenkürzel</h3>
 <table class="keys">
@@ -277,6 +283,7 @@ function openHelp() {
   body.querySelector('input.search').addEventListener('input', e => {     // Hilfe durchsuchen
     const q = e.target.value.trim().toLowerCase();
     body.querySelectorAll('li, p, tr').forEach(el => { el.style.display = !q || el.textContent.toLowerCase().includes(q) ? '' : 'none'; });
+    body.querySelectorAll('li li').forEach(el => { if (el.parentElement.closest('li').style.display !== 'none') el.style.display = ''; });   // Teilschritte gehören zum Eintrag
     body.querySelectorAll('h3').forEach(hd => { let n = hd.nextElementSibling, any = !q; for (; n && n.tagName !== 'H3'; n = n.nextElementSibling) if ((n.tagName === 'P' && n.style.display !== 'none') || [...n.querySelectorAll('li,tr')].some(x => x.style.display !== 'none')) any = true; hd.style.display = any ? '' : 'none'; });
     body.querySelector('.toc').style.display = q ? 'none' : '';
   });

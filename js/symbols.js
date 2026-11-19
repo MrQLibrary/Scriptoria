@@ -115,6 +115,20 @@ const SYMBOLS = [
     paths: ['M0,30 H20 M0,70 H20 M60,30 H80 M60,70 H80 M20,10 H60 V90 H20 Z M45,61 H55'], texts: [{ t: 'S', x: 28, y: 30, s: 12 }, { t: 'R', x: 28, y: 70, s: 12 }, { t: 'Q', x: 51, y: 30, s: 12 }, { t: 'Q', x: 50, y: 70, s: 12 }] }
 ];
 const SYM = Object.fromEntries(SYMBOLS.map(s => [s.id, s]));
+/* Schaltzustände: Schalter, Taster und Wechselschalter zeigen ihre Stellung auch in der Zeichnung */
+const SYM_STATE = {
+  'switch:1': { id: 'switch:1', paths: ['M0,20 H22 M58,20 H80 M22,20 L58,17'], fills: [circ(22, 20, 3), circ(58, 20, 3)] },
+  'button:1': { id: 'button:1', paths: ['M0,20 H22 M58,20 H80 M22,20 H58 M40,20 V10 M32,10 H48'] },
+  'switch_spdt:1': { id: 'switch_spdt:1', paths: ['M0,20 H22 M22,20 L57,32 M60,10 H80 M60,30 H80'], fills: [circ(22, 20, 3), circ(60, 10, 3), circ(60, 30, 3)] }
+};
+function symStateGeo(o, sym) {
+  if (o.sym === 'pot' && o.wiper != null && Math.abs(o.wiper - 0.5) > 0.01) {     // Schleifer an der eingestellten Stelle
+    const x = Math.round(20 + 40 * o.wiper);
+    return { id: 'pot@' + x, paths: ['M0,20 H20 M60,20 H80 M20,10 H60 V30 H20 Z', `M40,60 V48 H${x} V31 M${x - 5},38 L${x},31 L${+x + 5},38`] };
+  }
+  const st = (o.sym === 'switch' || o.sym === 'button') ? (o.closed ? 1 : 0) : o.sym === 'switch_spdt' ? (o.pos ? 1 : 0) : 0;
+  return st ? SYM_STATE[o.sym + ':' + st] : sym;
+}
 const symPaths = new Map();                        // Path2D-Cache
 function symP2D(sym) {
   let c = symPaths.get(sym.id);

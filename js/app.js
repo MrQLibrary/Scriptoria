@@ -153,12 +153,12 @@ async function openPdf(file) {
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
   toast('PDF wird geöffnet …', 60000);
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
-  if (pdf.numPages > 80 && !await confirmDlg('Großes PDF', `Das PDF hat ${pdf.numPages} Seiten. Wirklich alle einfügen?`, 'Alle einfügen')) { pdf.destroy(); return null; }
   return pdf;
 }
-async function renderPdfPages(pdf, each) {                // Seite für Seite: sofort sichtbar, wenig Speicher
-  for (let i = 1; i <= pdf.numPages; i++) {
-    toast(`PDF wird eingefügt … Seite ${i} von ${pdf.numPages}`, 60000);
+async function renderPdfPages(pdf, list, each) {          // Seite für Seite: sofort sichtbar, wenig Speicher
+  for (let j = 0; j < list.length; j++) {
+    const i = list[j];
+    toast(`PDF wird eingefügt … Seite ${i} (${j + 1} von ${list.length})`, 60000);
     const page = await pdf.getPage(i), s = Math.min(3, 1600 / page.getViewport({ scale: 1 }).width), v = page.getViewport({ scale: s });
     const c = document.createElement('canvas'); c.width = Math.ceil(v.width); c.height = Math.ceil(v.height);
     const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, c.width, c.height);
@@ -169,14 +169,44 @@ async function renderPdfPages(pdf, each) {                // Seite für Seite: s
   pdf.destroy();
 }
 const IMG_RE = /\.(png|jpe?g|svg|gif|webp|bmp|avif)$/;
-async function askPdfMode(name, pages) {
-  if (S.settings.pdfMode && S.settings.pdfMode !== 'ask') return S.settings.pdfMode;
-  const remember = h('input', { type: 'checkbox' });
-  const v = await dialog({ title: 'PDF einfügen', body: [h('p', {}, `„${name}“ hat ${pages} Seite${pages > 1 ? 'n' : ''}. Wie sollen sie eingefügt werden?`),
-    h('label', { class: 'chk' }, remember, ' Auswahl merken (änderbar in den Einstellungen)')],
-    buttons: [{ label: 'Abbrechen', value: null }, { label: 'Untereinander auf dieser Seite', value: 'stack' }, { label: 'Jede PDF-Seite als eigene Seite', primary: true, value: 'pages' }] });
-  if (v && remember.checked) changeSetting('pdfMode', v);
-  return v;
+function parsePageList(str, N) {                         // „5-20“, „1-3, 7, 10-“, leer = alle
+  const t = String(str || '').trim().toLowerCase(); if (!t || t === 'alle') return Array.from({ length: N }, (_, i) => i + 1);
+  const out = [];
+  for (const part of t.split(/[,;]+/).map(x => x.trim()).filter(Boolean)) {
+    const m = /^(\d+)?\s*(?:([-–])\s*(\d+)?)?$/.exec(part);
+    if (!m || (!m[1] && !m[3])) throw new Error(`„${part}“ ist keine gültige Seitenangabe.`);
+    const a = m[1] ? +m[1] : 1, b = m[2] ? (m[3] ? +m[3] : N) : a;
+    if (a < 1 || b < 1 || a > N || b > N) throw new Error(`Das PDF hat nur ${N} Seite${N > 1 ? 'n' : ''}.`);
+    for (let i = Math.min(a, b); i <= Math.max(a, b); i++) out.push(i);
+  }
+  if (!out.length) throw new Error('Bitte mindestens eine Seite angeben.');
+  return out;
+}
+async function askPdfOptions(name, N) {
+  const set = S.settings, def = { mode: set.pdfMode === 'stack' ? 'stack' : set.pdfMode === 'pages' ? 'pages' : (set.pdfLastMode || 'pages'), cols: set.pdfCols || 1, list: parsePageList('', N) };
+  if (set.pdfMode && set.pdfMode !== 'ask') return def;
+  let mode = def.mode, cols = def.cols;
+  const range = h('input', { type: 'text', value: N > 1 ? `1-${N}` : '1', style: 'width:100%' }), err = h('p', { class: 'err' }), info = h('span', { class: 'muted' });
+  const seg = (opts, cur, set) => { const el = h('div', { class: 'seg' }), mk = v => el.replaceChildren(...opts.map(([l, x]) => h('button', { class: v === x ? 'on' : '', onclick: () => { set(x); mk(x); upd(); } }, l))); mk(cur); return el; };
+  const upd = () => { try { const n = parsePageList(range.value, N).length; info.textContent = `${n} Seite${n > 1 ? 'n' : ''}` + (mode === 'pages' ? ` auf ${Math.ceil(n / cols)} Board-Seite${Math.ceil(n / cols) > 1 ? 'n' : ''}` : ''); err.textContent = ''; } catch (x) { info.textContent = ''; } };
+  range.oninput = upd;
+  const body = [
+    h('p', {}, `„${name}“ hat ${N} Seite${N > 1 ? 'n' : ''}.`),
+    h('div', { class: 'frow' }, h('label', {}, 'Seiten'), range), hint('z. B. 5-20 oder 1-3, 7, 10-12 · leer = alle'),
+    h('div', { class: 'frow' }, h('label', {}, 'Einfügen'), seg([['Jede als eigene Seite', 'pages'], ['Untereinander hier', 'stack']], mode, v => mode = v)),
+    h('div', { class: 'frow' }, h('label', {}, 'Nebeneinander'), seg([['1', 1], ['2', 2], ['3', 3], ['4', 4]], cols, v => cols = v)),
+    hint('„Nebeneinander“: so viele PDF-Seiten stehen in einer Reihe (bei „Jede als eigene Seite“ teilen sie sich eine Board-Seite).'),
+    info, err];
+  upd();
+  let res = null;
+  const ok = await dialog({ title: 'PDF einfügen', body, buttons: [{ label: 'Abbrechen', value: null }, { label: 'Einfügen', primary: true, value: true }],
+    onOpen: (dlg, close) => { const old = dlg.querySelector('.btn.primary'), btn = old.cloneNode(true); old.replaceWith(btn); range.focus(); range.select();
+      const go = () => { try { res = { mode, cols, list: parsePageList(range.value, N) }; close(true); } catch (x) { err.textContent = x.message; } };
+      btn.onclick = go; range.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } }); } });
+  if (!ok || !res) return null;
+  if (res.list.length > 80 && !await confirmDlg('Viele Seiten', `${res.list.length} Seiten einfügen? Das kann eine Weile dauern.`, 'Einfügen')) return null;
+  changeSetting('pdfLastMode', mode); changeSetting('pdfCols', cols);
+  return res;
 }
 function fitWidth(b) {                                   // Ansicht auf die Breite einer Seite einstellen (oberer Rand sichtbar)
   const w = b[2] - b[0], z = clamp(Math.min((innerWidth - 160) / w, 1.6), 0.15, 3);
@@ -191,19 +221,27 @@ async function addFiles(files, p) {
       if (name.endsWith('.owb')) { await importProjectText(await f.text(), f.path || null); return; }
       if (f.type === 'application/pdf' || name.endsWith('.pdf')) {
         const pdf = await openPdf(f); if (!pdf) continue;
-        const mode = await askPdfMode(f.name, pdf.numPages); if (!mode) { pdf.destroy(); continue; }
-        const W = 800;
-        if (mode === 'pages') {
-          let first = true;
-          await renderPdfPages(pdf, pg => {
-            const o = makeImgObj(pg.src, pg.w, pg.h, 0, 0, W); o.lock = true;
-            if (first && !S.objs.length) { S.objs.push(o); record(pre); } else { addPage([o]); }
-            first = false; fitWidth(objBounds(o)); n++;
+        const opt = await askPdfOptions(f.name, pdf.numPages); if (!opt) { pdf.destroy(); continue; }
+        const W = 800, GAP = 24, cols = opt.cols;
+        if (opt.mode === 'pages') {
+          let first = true, row = [];
+          const flush = () => {                              // eine Board-Seite mit „cols“ PDF-Seiten nebeneinander
+            if (!row.length) return;
+            if (first && !S.objs.length) { S.objs.push(...row); record(pre); } else addPage(row);
+            first = false; fitWidth(allBounds(row)); row = [];
+          };
+          await renderPdfPages(pdf, opt.list, pg => {
+            const o = makeImgObj(pg.src, pg.w, pg.h, row.length * (W + GAP), 0, W); o.lock = true; row.push(o); n++;
+            if (row.length >= cols) flush();
           });
+          flush();
         } else {
-          const c = viewCenter(); let x = (p ? p.x : c.x) - W / 2, y = p ? p.y : (60 - S.view.y) / S.view.z; const start = added.length;
-          await renderPdfPages(pdf, pg => { const o = makeImgObj(pg.src, pg.w, pg.h, x, y, W); o.lock = true; S.objs.push(o); added.push(o); y += o.h + 24; n++; render(); });
-          if (added.length > start) fitWidth(objBounds(added[start]));
+          const c = viewCenter(), totalW = cols * W + (cols - 1) * GAP; let x0 = (p ? p.x : c.x) - totalW / 2, y = p ? p.y : (60 - S.view.y) / S.view.z, col = 0, rowH = 0; const start = added.length;
+          await renderPdfPages(pdf, opt.list, pg => {
+            const o = makeImgObj(pg.src, pg.w, pg.h, x0 + col * (W + GAP), y, W); o.lock = true; S.objs.push(o); added.push(o); n++;
+            rowH = Math.max(rowH, o.h); if (++col >= cols) { col = 0; y += rowH + GAP; rowH = 0; } render();
+          });
+          if (added.length > start) fitWidth(allBounds(added.slice(start, start + cols)));
         }
         pdfDone = true;
       } else if (/^image\//.test(f.type) || IMG_RE.test(name)) {
