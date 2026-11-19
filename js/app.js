@@ -41,6 +41,7 @@ function projectJSON(withImgs = true) {
   return JSON.stringify({ format: FORMAT, version: FORMAT_VERSION, name: p.name, created: p.created, modified: p.modified, view: S.view, ruler: S.ruler, geo: S.geo, bg: S.bg || null, pages: pagesJSON(), page: S.page, imgs: withImgs ? usedImgs() : {} });
 }
 function loadIntoEditor(meta, data, storedImgs = {}) {
+  if (window.SIM && SIM.on) stopSim();                        // Simulation gehört zum jeweiligen Board
   S.project = { id: meta.id, name: meta.name, created: meta.created, modified: meta.modified, filePath: meta.filePath || null };
   initPages(data); S.imgs = { ...(data.imgs || {}), ...storedImgs }; clearImgCache();
   S.savedImgs = new Set(Object.keys(storedImgs)); S.bg = data.bg || null;
@@ -72,7 +73,7 @@ async function openProject(id) {
   } catch (e) { console.error(e); toast('Die Datei ist beschädigt.'); }
 }
 async function goHome() {
-  if (S.editing) commitEdit();
+  if (S.editing) commitEdit(); if (SIM.on) stopSim();
   if (S.dirty) await doSave(true);
   S.screen = 'home'; $('#editor').hidden = true; $('#home').hidden = false; $('#elec').hidden = true; document.body.classList.remove('in-editor');
   applyTheme(); renderHome();
@@ -130,7 +131,7 @@ async function saveFile(saveAs) {
 }
 async function importProjectText(text, path) {
   let data; try { data = JSON.parse(text); } catch (e) { toast('Das ist keine gültige Whiteboard-Datei.'); return; }
-  if (!data || !Array.isArray(data.objs)) { toast('Das ist keine gültige Whiteboard-Datei.'); return; }
+  if (!data || !(Array.isArray(data.objs) || Array.isArray(data.pages))) { toast('Das ist keine gültige Whiteboard-Datei.'); return; }
   const now = Date.now(), name = data.name || (path ? path.split(/[\\/]/).pop().replace(/\.owb$/i, '') : 'Importiertes Whiteboard');
   loadIntoEditor({ id: uid(), name, created: data.created || now, modified: now, filePath: path || null }, data);
   S.dirty = true; await doSave(true);

@@ -337,8 +337,22 @@ function flipStylus() {                                  // Wachstafel: Stilus u
 }
 
 /* ---------- Vorlage wählen ---------- */
+function swapEra(from, to) {                              // Inhalte jeder Epoche getrennt aufbewahren: beim Wechsel ausblenden, beim Zurückwechseln wieder da
+  if (!S.pages || from === to) return;
+  if (window.SIM && SIM.on) stopSim();
+  syncPage();
+  for (const pg of S.pages) {
+    pg.eras = pg.eras || {};
+    if (pg.objs.length) pg.eras[from] = pg.objs; else delete pg.eras[from];
+    pg.objs = pg.eras[to] || []; delete pg.eras[to];
+    pg.hist = []; pg.fut = []; pg.histSize = 0;
+  }
+  const pg = S.pages[S.page]; S.objs = pg.objs; S.hist = []; S.fut = []; S.histSize = 0; S.sels = []; S.draft = null;
+  if (window.syncHist) syncHist();
+}
 function setTemplate(id) {
   if (S.editing) commitEdit();
+  swapEra(S.bg || 'modern', (id && HIST[id]) ? id : 'modern');
   S.bg = id && HIST[id] ? id : null; S.tplIdx = 0; S.tablet = 0; markDirty(); presentDirty();
   if (S.bg) { const r = tplHomeRect(0); if (r) fitRect(r); selectPen(0); } else setTool('pen');
   refreshUI(); render();

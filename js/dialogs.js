@@ -242,6 +242,7 @@ function openHelp() {
 <li><b>Schiefertafel:</b> mit Schreiblinien, Griffel, Kreide, Schwamm und Läppchen.</li>
 <li><b>Pergament mit Gänsekiel:</b> Breitfeder in Eisengallustinte, Zinnoberrot und Azuritblau, Bleigriffel zum Vorziehen von Linien; Fehler werden mit dem Federmesser abgeschabt.</li>
 </ul>
+<p>Jede Epoche hat ihren eigenen Inhalt: Beim Wechsel der Vorlage verschwindet, was mit der vorigen geschrieben wurde – wechselt man zurück, ist es wieder da.</p>
 <p>Je nach Tafel stehen passende Hilfsmittel der Zeit bereit, z. B. Tafellineal, Tafelzirkel und Zeigestock an der Kreidetafel, Regula und Circinus bei der Wachstafel oder Zirkel und Lineal bei Archimedes. Zirkelbögen werden mit dem gewählten Schreibgerät gezogen. Mit <b>„Nur historische Werkzeuge“</b> in den Einstellungen blenden Sie alle modernen Werkzeuge aus.</p>
 
 <h3 id="hs9">Ansicht</h3>

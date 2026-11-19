@@ -2,16 +2,17 @@
 /* ===== Seiten: mehrere unendliche Boards in einem Whiteboard (z. B. eine Seite pro Vorlesungsteil oder PDF-Seite) ===== */
 function initPages(data) {
   const src = Array.isArray(data.pages) && data.pages.length ? data.pages : [{ objs: Array.isArray(data.objs) ? data.objs : [], view: data.view }];
-  S.pages = src.map(pg => ({ objs: Array.isArray(pg.objs) ? pg.objs : [], view: pg.view || emptyView(), hist: [], fut: [], histSize: 0 }));
+  S.pages = src.map(pg => ({ objs: Array.isArray(pg.objs) ? pg.objs : [], view: pg.view || emptyView(), eras: pg.eras || {}, hist: [], fut: [], histSize: 0 }));
   S.page = clamp(data.page || 0, 0, S.pages.length - 1);
   const pg = S.pages[S.page]; S.objs = pg.objs; S.view = pg.view;
 }
 function syncPage() { const pg = S.pages && S.pages[S.page]; if (!pg) return; pg.objs = S.objs; pg.view = S.view; pg.hist = S.hist; pg.fut = S.fut; pg.histSize = S.histSize; }
-function allObjs() { syncPage(); return S.pages ? S.pages.flatMap(pg => pg.objs) : S.objs; }
-function pagesJSON() { syncPage(); return S.pages.map(pg => ({ objs: pg.objs, view: pg.view })); }
+function allObjs() { syncPage(); return S.pages ? S.pages.flatMap(pg => [...pg.objs, ...Object.values(pg.eras || {}).flat()]) : S.objs; }
+function pagesJSON() { syncPage(); return S.pages.map(pg => ({ objs: pg.objs, view: pg.view, ...(pg.eras && Object.keys(pg.eras).length ? { eras: pg.eras } : {}) })); }
 function gotoPage(i) {
   if (!S.pages || i < 0 || i >= S.pages.length || i === S.page) return;
   if (S.editing) commitEdit(); if (S.wire) wireFinish();
+  if (SIM.on) stopSim();
   syncPage(); S.page = i; const pg = S.pages[i];
   S.objs = pg.objs; S.view = pg.view; S.hist = pg.hist || []; S.fut = pg.fut || []; S.histSize = pg.histSize || 0;
   S.sels = []; S.draft = null; markDirty(); presentDirty(); simDirty(); if (window.syncHist) syncHist(); refreshUI(); render(); updateCursor();
